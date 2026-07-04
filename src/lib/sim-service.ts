@@ -10,12 +10,20 @@ export async function buildPlayDateMap(agentId?: string) {
   const filter: Record<string, unknown> = {};
   if (agentId) filter.agentId = agentId;
 
-  const games = await Game.find(filter).select('agentId sessionId date').sort({ date: -1 });
-  const map = new Map<string, string>();
+  const games = await Game.find(filter)
+    .select('agentId sessionId date createdAt')
+    .sort({ createdAt: -1 });
+
+  const map = new Map<string, Date>();
 
   for (const g of games) {
     const key = `${g.agentId.toString()}:${g.sessionId}`;
-    if (!map.has(key)) map.set(key, g.date);
+    if (!map.has(key)) {
+      const playedAt = g.createdAt
+        ? new Date(g.createdAt)
+        : new Date(`${g.date}T00:00:00`);
+      map.set(key, playedAt);
+    }
   }
   return map;
 }
@@ -23,9 +31,15 @@ export async function buildPlayDateMap(agentId?: string) {
 export function computeSimDates(
   agentId: string,
   sessionId: number,
-  playMap: Map<string, string>
+  playMap: Map<string, Date>
 ): SimComputed {
   return computeSimDatesFromMap(agentId, sessionId, playMap);
+}
+
+export async function getNextSessionId(agentId: string): Promise<number> {
+  await connectDB();
+  const latest = await SimCard.findOne({ agentId }).sort({ sessionId: -1 }).select('sessionId');
+  return latest ? latest.sessionId + 1 : 1;
 }
 
 export async function getAvailableSims(agentId?: string) {

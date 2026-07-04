@@ -35,7 +35,7 @@ Two-role reward management system: **Admin** and **Agents**.
 ### Admin
 | Route | Description |
 |-------|-------------|
-| `/login` | Admin login |
+| `/admin/login` | Admin login |
 | `/games` | Add/edit game winnings (75% net, 50% expected auto-calc) |
 | `/report` | General & specific summaries, full history, calendar |
 | `/agents` | Manage agents & SIM cards, map session IDs |
@@ -45,7 +45,7 @@ Two-role reward management system: **Admin** and **Agents**.
 ### Agent
 | Route | Description |
 |-------|-------------|
-| `/agent/login` | Agent login |
+| `/login` | Agent login |
 | `/agent/games` | View winnings, mark as paid |
 | `/agent/summary` | Personal summary |
 | `/agent/numbers` | SIM card list with sorting |

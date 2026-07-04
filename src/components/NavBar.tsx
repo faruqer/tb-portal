@@ -15,7 +15,7 @@ interface NavBarProps {
   brandHref?: string;
 }
 
-export function NavBar({ links, userLabel, logoutRedirect = '/login', brandHref = '/games' }: NavBarProps) {
+export function NavBar({ links, userLabel, logoutRedirect = '/admin/login', brandHref = '/games' }: NavBarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const initial = userLabel?.charAt(0).toUpperCase() || '?';

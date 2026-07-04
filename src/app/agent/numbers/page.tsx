@@ -3,13 +3,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { agentLinks } from '@/components/NavBar';
+import { PhoneReveal } from '@/components/PhoneReveal';
 import { useSession, apiFetch } from '@/lib/hooks';
+import { formatDateTime } from '@/lib/calculations';
 import { sortSims, groupColorClass } from '@/lib/sort-sims';
 import type { SimSortMode } from '@/lib/types';
 
 interface Sim {
   id: string; phoneNumber: string; sessionId: number; groupId: string | null;
-  lastPlayedDate: string | null; nextPlayingDate: string | null; isAvailable: boolean;
+  lastPlayedDate: string | null; nextPlayingDate: string | null; nextPlayingAt: string | null;
+  isAvailable: boolean;
 }
 
 export default function AgentNumbersPage() {
@@ -29,7 +32,7 @@ export default function AgentNumbersPage() {
     <AppShell
       links={agentLinks}
       userLabel={session?.agentName || 'Agent'}
-      logoutRedirect="/agent/login"
+      logoutRedirect="/login"
       brandHref="/agent/games"
       title="My Numbers"
       subtitle="SIM cards assigned to you"
@@ -53,11 +56,11 @@ export default function AgentNumbersPage() {
                 sorted.map((s) => (
                   <tr key={s.id} className={groupColorClass(s.groupId)}>
                     <td><strong>{s.sessionId}</strong></td>
-                    <td>{s.phoneNumber}</td>
+                    <td><PhoneReveal phone={s.phoneNumber} /></td>
                     <td>{s.groupId ? <span className="badge-group">{s.groupId}</span> : '—'}</td>
                     <td>{s.lastPlayedDate || '—'}</td>
                     <td>
-                      {s.isAvailable ? 'Ready' : (s.nextPlayingDate || '—')}
+                      {s.isAvailable ? 'Ready' : formatDateTime(s.nextPlayingAt)}
                     </td>
                   </tr>
                 ))

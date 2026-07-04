@@ -27,13 +27,19 @@ export async function middleware(req: NextRequest) {
   const session = await getSessionFromRequest(req);
 
   if (pathname === '/login') {
+    if (session?.role === 'agent') {
+      return NextResponse.redirect(new URL('/agent/games', req.url));
+    }
     if (session?.role === 'admin') {
       return NextResponse.redirect(new URL('/games', req.url));
     }
     return NextResponse.next();
   }
 
-  if (pathname === '/agent/login') {
+  if (pathname === '/admin/login') {
+    if (session?.role === 'admin') {
+      return NextResponse.redirect(new URL('/games', req.url));
+    }
     if (session?.role === 'agent') {
       return NextResponse.redirect(new URL('/agent/games', req.url));
     }
@@ -41,12 +47,12 @@ export async function middleware(req: NextRequest) {
   }
 
   if (adminRoutes.some((r) => pathname === r || pathname.startsWith(`${r}/`))) {
-    if (!session) return NextResponse.redirect(new URL('/login', req.url));
+    if (!session) return NextResponse.redirect(new URL('/admin/login', req.url));
     if (session.role !== 'admin') return NextResponse.redirect(new URL('/agent/games', req.url));
   }
 
   if (agentRoutes.some((r) => pathname === r || pathname.startsWith(`${r}/`))) {
-    if (!session) return NextResponse.redirect(new URL('/agent/login', req.url));
+    if (!session) return NextResponse.redirect(new URL('/login', req.url));
     if (session.role !== 'agent') return NextResponse.redirect(new URL('/games', req.url));
   }
 
@@ -57,6 +63,7 @@ export const config = {
   matcher: [
     '/',
     '/login',
+    '/admin/login',
     '/games/:path*',
     '/report/:path*',
     '/agents/:path*',

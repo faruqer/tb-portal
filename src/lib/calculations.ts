@@ -35,6 +35,26 @@ export function addDaysStr(dateStr: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+export function addDaysToDate(date: Date, days: number): Date {
+  const copy = new Date(date);
+  copy.setDate(copy.getDate() + days);
+  return copy;
+}
+
+export function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
 export function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }

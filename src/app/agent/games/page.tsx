@@ -53,7 +53,7 @@ export default function AgentGamesPage() {
     <AppShell
       links={agentLinks}
       userLabel={session?.agentName || 'Agent'}
-      logoutRedirect="/agent/login"
+      logoutRedirect="/login"
       brandHref="/agent/games"
       title="My Games"
       subtitle="Mark games as paid after sending money to admin"

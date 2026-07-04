@@ -1,4 +1,4 @@
-import { NEXT_PLAY_DELAY_DAYS, addDaysStr, todayStr } from '@/lib/calculations';
+import { NEXT_PLAY_DELAY_DAYS, addDaysToDate } from '@/lib/calculations';
 
 export type SimSortMode = 'ascending' | 'grouped' | 'by-agent' | 'by-agent-group';
 
@@ -57,20 +57,27 @@ export { NEXT_PLAY_DELAY_DAYS };
 
 export interface SimComputed {
   lastPlayedDate: string | null;
+  lastPlayedAt: string | null;
   nextPlayingDate: string | null;
+  nextPlayingAt: string | null;
   isAvailable: boolean;
 }
 
 export function computeSimDatesFromMap(
   agentId: string,
   sessionId: number,
-  playMap: Map<string, string>
+  playMap: Map<string, Date>
 ): SimComputed {
   const key = `${agentId}:${sessionId}`;
-  const lastPlayedDate = playMap.get(key) ?? null;
-  const nextPlayingDate = lastPlayedDate ? addDaysStr(lastPlayedDate, NEXT_PLAY_DELAY_DAYS) : null;
-  // Available exactly after 7 full days (on the 7th day after play date)
-  const isAvailable = !lastPlayedDate || todayStr() >= (nextPlayingDate ?? '');
+  const lastPlayed = playMap.get(key) ?? null;
+  const nextPlaying = lastPlayed ? addDaysToDate(lastPlayed, NEXT_PLAY_DELAY_DAYS) : null;
+  const isAvailable = !lastPlayed || Date.now() >= (nextPlaying?.getTime() ?? 0);
 
-  return { lastPlayedDate, nextPlayingDate, isAvailable };
+  return {
+    lastPlayedDate: lastPlayed ? lastPlayed.toISOString().slice(0, 10) : null,
+    lastPlayedAt: lastPlayed?.toISOString() ?? null,
+    nextPlayingDate: nextPlaying ? nextPlaying.toISOString().slice(0, 10) : null,
+    nextPlayingAt: nextPlaying?.toISOString() ?? null,
+    isAvailable,
+  };
 }

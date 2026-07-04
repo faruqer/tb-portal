@@ -5,6 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { adminLinks } from '@/components/NavBar';
 import { Modal } from '@/components/Modal';
 import { useSession, apiFetch } from '@/lib/hooks';
+import { formatDateTime } from '@/lib/calculations';
 import { sortSims, groupColorClass } from '@/lib/sort-sims';
 import type { SimSortMode } from '@/lib/types';
 
@@ -22,6 +23,7 @@ interface Sim {
   groupId: string | null;
   lastPlayedDate: string | null;
   nextPlayingDate: string | null;
+  nextPlayingAt: string | null;
   isAvailable: boolean;
 }
 
@@ -37,6 +39,21 @@ export default function AgentsPage() {
   const [agentForm, setAgentForm] = useState({ name: '', username: '', password: '' });
   const [editForm, setEditForm] = useState({ name: '', username: '', password: '' });
   const [simForm, setSimForm] = useState({ phoneNumber: '', sessionId: '1', groupId: '' });
+
+  function nextSessionIdForAgent(agentId: string): number {
+    const ids = sims.filter((s) => s.agentId === agentId).map((s) => s.sessionId);
+    return ids.length ? Math.max(...ids) + 1 : 1;
+  }
+
+  function openSimModal() {
+    if (!selectedAgent) return;
+    setSimForm({
+      phoneNumber: '',
+      sessionId: String(nextSessionIdForAgent(selectedAgent)),
+      groupId: '',
+    });
+    setSimModal(true);
+  }
 
   const selectedAgentData = agents.find((a) => a.id === selectedAgent);
   const existingGroups = useMemo(() => {
@@ -105,7 +122,7 @@ export default function AgentsPage() {
       }),
     });
     setSimModal(false);
-    setSimForm({ phoneNumber: '', sessionId: '1', groupId: '' });
+    setSimForm({ phoneNumber: '', sessionId: String(nextSessionIdForAgent(selectedAgent)), groupId: '' });
     await load();
   }
 
@@ -135,7 +152,7 @@ export default function AgentsPage() {
       actions={
         <>
           <button type="button" className="btn-secondary" onClick={() => setAgentModal(true)}>+ Agent</button>
-          <button type="button" onClick={() => setSimModal(true)} disabled={!selectedAgent}>+ SIM</button>
+          <button type="button" onClick={openSimModal} disabled={!selectedAgent}>+ SIM</button>
         </>
       }
     >
@@ -231,12 +248,12 @@ export default function AgentsPage() {
                       </td>
                       <td>{s.lastPlayedDate || '—'}</td>
                       <td>
-                        {s.nextPlayingDate ? (
-                          <span className={s.isAvailable ? 'badge badge-success' : 'badge badge-muted'}>
-                            {s.nextPlayingDate}
-                          </span>
-                        ) : (
+                        {s.isAvailable ? (
                           <span className="badge badge-success">Ready</span>
+                        ) : s.nextPlayingAt ? (
+                          <span className="badge badge-muted">{formatDateTime(s.nextPlayingAt)}</span>
+                        ) : (
+                          <span className="badge badge-muted">—</span>
                         )}
                       </td>
                       <td>
@@ -272,7 +289,10 @@ export default function AgentsPage() {
       <Modal open={simModal} title="Add SIM Card" onClose={() => setSimModal(false)}
         footer={<><button type="button" className="btn-secondary" onClick={() => setSimModal(false)}>Cancel</button><button type="submit" form="add-sim">Add</button></>}>
         <form id="add-sim" className="form-grid" onSubmit={createSim}>
-          <div className="field"><label className="label">Session ID</label><input type="number" value={simForm.sessionId} onChange={(e) => setSimForm({ ...simForm, sessionId: e.target.value })} required /></div>
+          <div className="field">
+            <label className="label">Session ID (auto)</label>
+            <input type="number" value={simForm.sessionId} readOnly />
+          </div>
           <div className="field"><label className="label">Phone Number</label><input value={simForm.phoneNumber} onChange={(e) => setSimForm({ ...simForm, phoneNumber: e.target.value })} required /></div>
           <div className="field">
             <label className="label">Group ID (optional — use same ID to group cards)</label>

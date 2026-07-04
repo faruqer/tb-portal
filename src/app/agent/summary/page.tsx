@@ -42,7 +42,7 @@ export default function AgentSummaryPage() {
     <AppShell
       links={agentLinks}
       userLabel={session?.agentName || 'Agent'}
-      logoutRedirect="/agent/login"
+      logoutRedirect="/login"
       brandHref="/agent/games"
       title="Summary"
       subtitle="Your earnings overview and payment history"

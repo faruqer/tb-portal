@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { adminLinks } from '@/components/NavBar';
 import { useSession, apiFetch } from '@/lib/hooks';
+import { formatDateTime } from '@/lib/calculations';
 import { sortSims, groupColorClass } from '@/lib/sort-sims';
 
 interface Agent { id: string; name: string; }
@@ -11,7 +12,7 @@ interface Agent { id: string; name: string; }
 interface Sim {
   id: string; agentId: string; agentName?: string;
   phoneNumber: string; sessionId: number; groupId: string | null;
-  lastPlayedDate: string | null; nextPlayingDate: string | null; isAvailable: boolean;
+  lastPlayedDate: string | null; nextPlayingDate: string | null; nextPlayingAt: string | null; isAvailable: boolean;
 }
 
 interface SimSummary {
@@ -91,7 +92,7 @@ export default function AvailablePage() {
                       <td>{s.phoneNumber}</td>
                       <td>{s.groupId ? <span className="badge-group">{s.groupId}</span> : '—'}</td>
                       <td>{s.lastPlayedDate || 'Never'}</td>
-                      <td>{s.nextPlayingDate || 'Ready'}</td>
+                      <td>{s.isAvailable ? 'Ready' : formatDateTime(s.nextPlayingAt)}</td>
                     </tr>
                   ))
                 )}

@@ -3,7 +3,7 @@ import { connectDB } from '@/lib/mongodb';
 import { getSession } from '@/lib/auth';
 import { parseSessionId, normalizeGroupId } from '@/lib/calculations';
 import { jsonOk, jsonError, requireAdmin, serializeDoc } from '@/lib/api-utils';
-import { buildPlayDateMap, computeSimDates, getAvailableSims } from '@/lib/sim-service';
+import { buildPlayDateMap, computeSimDates, getAvailableSims, getNextSessionId } from '@/lib/sim-service';
 import { SimCard } from '@/models/SimCard';
 
 export async function GET(req: NextRequest) {
@@ -78,10 +78,15 @@ export async function POST(req: NextRequest) {
   }
 
   await connectDB();
+
+  let sid = sessionId !== undefined && sessionId !== null && sessionId !== ''
+    ? parseSessionId(sessionId)
+    : await getNextSessionId(agentId);
+
   const sim = await SimCard.create({
     agentId,
     phoneNumber: String(phoneNumber).trim(),
-    sessionId: parseSessionId(sessionId ?? 0),
+    sessionId: sid,
     groupId: normalizeGroupId(groupId),
   });
 
