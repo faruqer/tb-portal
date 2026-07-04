@@ -774,6 +774,9 @@ button:disabled, .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: 
   transform: none;
   box-shadow: none;
 }
+.phone-reveal-input {
+  min-width: 120px;
+}
 
 .empty-state {
   padding: 2.5rem 1rem;

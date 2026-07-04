@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { adminLinks } from '@/components/NavBar';
+import { PhoneReveal } from '@/components/PhoneReveal';
 import { useSession, apiFetch } from '@/lib/hooks';
 import { formatDateTime } from '@/lib/calculations';
 import { sortSims, groupColorClass } from '@/lib/sort-sims';
@@ -89,7 +90,7 @@ export default function AvailablePage() {
                     <tr key={s.id} className={groupColorClass(s.groupId)}>
                       <td>{s.agentName}</td>
                       <td><strong>{s.sessionId}</strong></td>
-                      <td>{s.phoneNumber}</td>
+                      <td><PhoneReveal phone={s.phoneNumber} /></td>
                       <td>{s.groupId ? <span className="badge-group">{s.groupId}</span> : '—'}</td>
                       <td>{s.lastPlayedDate || 'Never'}</td>
                       <td>{s.isAvailable ? 'Ready' : formatDateTime(s.nextPlayingAt)}</td>

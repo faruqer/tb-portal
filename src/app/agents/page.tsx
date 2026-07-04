@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { adminLinks } from '@/components/NavBar';
 import { Modal } from '@/components/Modal';
+import { PhoneReveal } from '@/components/PhoneReveal';
 import { useSession, apiFetch } from '@/lib/hooks';
 import { formatDateTime } from '@/lib/calculations';
 import { sortSims, groupColorClass } from '@/lib/sort-sims';
@@ -221,12 +222,10 @@ export default function AgentsPage() {
                         />
                       </td>
                       <td>
-                        <input
-                          className="inline-input"
-                          defaultValue={s.phoneNumber}
-                          onBlur={(e) =>
-                            e.target.value !== s.phoneNumber && updateSim(s.id, { phoneNumber: e.target.value })
-                          }
+                        <PhoneReveal
+                          phone={s.phoneNumber}
+                          editable
+                          onSave={(val) => updateSim(s.id, { phoneNumber: val })}
                         />
                       </td>
                       <td>
