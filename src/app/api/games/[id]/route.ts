@@ -1,10 +1,8 @@
 import { NextRequest } from 'next/server';
-import { connectDB } from '@/lib/mongodb';
+import { getModels } from '@/lib/mongodb';
 import { getSession } from '@/lib/auth';
 import { calcNetProfit, calcExpectedToReceive } from '@/lib/calculations';
 import { jsonOk, jsonError, requireAdmin, serializeDoc } from '@/lib/api-utils';
-import { Game } from '@/models/Game';
-import { VerificationRequest } from '@/models/VerificationRequest';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -14,7 +12,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const body = await req.json();
-  await connectDB();
+  const { Game, VerificationRequest } = await getModels();
 
   const game = await Game.findById(id);
   if (!game) return jsonError('Game not found', 404);
@@ -79,7 +77,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (denied) return denied;
 
   const { id } = await params;
-  await connectDB();
+  const { Game, VerificationRequest } = await getModels();
   await Promise.all([Game.findByIdAndDelete(id), VerificationRequest.deleteMany({ gameId: id })]);
   return jsonOk({ ok: true });
 }

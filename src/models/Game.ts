@@ -1,6 +1,6 @@
-import mongoose, { Schema, models, model } from 'mongoose';
+import mongoose, { Schema, type Connection } from 'mongoose';
 
-const GameSchema = new Schema(
+export const GameSchema = new Schema(
   {
     legacyId: { type: String, index: true },
     gameName: { type: String, required: true, trim: true },
@@ -25,4 +25,6 @@ const GameSchema = new Schema(
 
 export type GameDoc = mongoose.InferSchemaType<typeof GameSchema> & { _id: mongoose.Types.ObjectId };
 
-export const Game = models.Game || model('Game', GameSchema);
+export function getGameModel(conn: Connection) {
+  return conn.models.Game || conn.model('Game', GameSchema);
+}

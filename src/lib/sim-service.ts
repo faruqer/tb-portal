@@ -1,12 +1,10 @@
-import { connectDB } from '@/lib/mongodb';
-import { SimCard } from '@/models/SimCard';
-import { Game } from '@/models/Game';
+import { getModels } from '@/lib/mongodb';
 import { computeSimDatesFromMap, type SimComputed } from '@/lib/sort-sims';
 
 export type { SimComputed };
 
 export async function buildPlayDateMap(agentId?: string) {
-  await connectDB();
+  const { Game } = await getModels();
   const filter: Record<string, unknown> = {};
   if (agentId) filter.agentId = agentId;
 
@@ -28,22 +26,45 @@ export async function buildPlayDateMap(agentId?: string) {
   return map;
 }
 
+function simOverrides(obj: {
+  lastPlayedAtOverride?: Date | null;
+  nextPlayingAtOverride?: Date | null;
+}) {
+  const overrides: { lastPlayedAt?: Date; nextPlayingAt?: Date } = {};
+  if (obj.lastPlayedAtOverride) overrides.lastPlayedAt = new Date(obj.lastPlayedAtOverride);
+  if (obj.nextPlayingAtOverride) overrides.nextPlayingAt = new Date(obj.nextPlayingAtOverride);
+  return overrides.lastPlayedAt || overrides.nextPlayingAt ? overrides : undefined;
+}
+
 export function computeSimDates(
   agentId: string,
   sessionId: number,
+  playMap: Map<string, Date>,
+  overrides?: ReturnType<typeof simOverrides>
+) {
+  return computeSimDatesFromMap(agentId, sessionId, playMap, overrides);
+}
+
+export function enrichSimWithDates(
+  agentId: string,
+  simObj: {
+    sessionId: number;
+    lastPlayedAtOverride?: Date | null;
+    nextPlayingAtOverride?: Date | null;
+  },
   playMap: Map<string, Date>
 ): SimComputed {
-  return computeSimDatesFromMap(agentId, sessionId, playMap);
+  return computeSimDates(agentId, simObj.sessionId, playMap, simOverrides(simObj));
 }
 
 export async function getNextSessionId(agentId: string): Promise<number> {
-  await connectDB();
+  const { SimCard } = await getModels();
   const latest = await SimCard.findOne({ agentId }).sort({ sessionId: -1 }).select('sessionId');
   return latest ? latest.sessionId + 1 : 1;
 }
 
 export async function getAvailableSims(agentId?: string) {
-  await connectDB();
+  const { SimCard } = await getModels();
   const filter: Record<string, unknown> = {};
   if (agentId) filter.agentId = agentId;
 
@@ -53,13 +74,14 @@ export async function getAvailableSims(agentId?: string) {
   ]);
 
   return sims.filter((sim) => {
-    const dates = computeSimDates(sim.agentId.toString(), sim.sessionId, playMap);
+    const obj = sim.toObject();
+    const dates = enrichSimWithDates(sim.agentId.toString(), obj, playMap);
     return dates.isAvailable;
   });
 }
 
 export async function getAgentSessionIds(agentId: string): Promise<number[]> {
-  await connectDB();
+  const { SimCard } = await getModels();
   const sims = await SimCard.find({ agentId }).select('sessionId');
   return [...new Set(sims.map((s) => s.sessionId))].sort((a, b) => a - b);
 }

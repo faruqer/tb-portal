@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePhoneReveal } from '@/components/PhoneRevealContext';
 
 function maskPhone(): string {
   return '****';
@@ -38,8 +39,10 @@ function EyeButton({ visible, onClick }: { visible: boolean; onClick: () => void
 }
 
 export function PhoneReveal({ phone, editable, onSave }: PhoneRevealProps) {
-  const [visible, setVisible] = useState(false);
+  const { showAll } = usePhoneReveal();
+  const [localVisible, setLocalVisible] = useState(false);
   const [value, setValue] = useState(phone);
+  const visible = showAll || localVisible;
 
   useEffect(() => {
     setValue(phone);
@@ -68,7 +71,7 @@ export function PhoneReveal({ phone, editable, onSave }: PhoneRevealProps) {
         ) : (
           <span className="phone-reveal-value">{maskPhone()}</span>
         )}
-        <EyeButton visible={visible} onClick={() => setVisible((v) => !v)} />
+        <EyeButton visible={visible} onClick={() => setLocalVisible((v) => !v)} />
       </span>
     );
   }
@@ -76,7 +79,7 @@ export function PhoneReveal({ phone, editable, onSave }: PhoneRevealProps) {
   return (
     <span className="phone-reveal">
       <span className="phone-reveal-value">{visible ? phone : maskPhone()}</span>
-      <EyeButton visible={visible} onClick={() => setVisible((v) => !v)} />
+      <EyeButton visible={visible} onClick={() => setLocalVisible((v) => !v)} />
     </span>
   );
 }

@@ -1,14 +1,11 @@
 import { NextRequest } from 'next/server';
-import { connectDB } from '@/lib/mongodb';
+import { getModels } from '@/lib/mongodb';
 import { getSession } from '@/lib/auth';
 import { jsonOk, requireAuth } from '@/lib/api-utils';
 import type { GameTotals } from '@/lib/types';
 import { addDaysStr } from '@/lib/calculations';
 import { resolveAgentId, emptyTotals, addToTotals } from '@/lib/game-utils';
-import { Game } from '@/models/Game';
-import { SimCard } from '@/models/SimCard';
-import { Agent } from '@/models/Agent';
-import { buildPlayDateMap, computeSimDates } from '@/lib/sim-service';
+import { buildPlayDateMap, enrichSimWithDates } from '@/lib/sim-service';
 
 function getWeekStart(d: Date): string {
   const copy = new Date(d);
@@ -73,7 +70,7 @@ export async function GET(req: NextRequest) {
   const denied = requireAuth(session);
   if (denied) return denied;
 
-  await connectDB();
+  const { Game, SimCard, Agent } = await getModels();
   const { searchParams } = new URL(req.url);
   const date = searchParams.get('date');
   const agentId = searchParams.get('agentId');
@@ -101,7 +98,7 @@ export async function GET(req: NextRequest) {
     );
     let available = 0;
     for (const s of sims) {
-      const dates = computeSimDates(s.agentId.toString(), s.sessionId, playMap);
+      const dates = enrichSimWithDates(s.agentId.toString(), s.toObject(), playMap);
       if (dates.isAvailable) available++;
     }
     return jsonOk({ total: sims.length, inUse: sims.length - available, free: available });
@@ -115,7 +112,7 @@ export async function GET(req: NextRequest) {
       const agentSims = sims.filter((s) => s.agentId.toString() === agent._id.toString());
       let free = 0;
       for (const s of agentSims) {
-        if (computeSimDates(agent._id.toString(), s.sessionId, playMap).isAvailable) free++;
+        if (enrichSimWithDates(agent._id.toString(), s.toObject(), playMap).isAvailable) free++;
       }
       return {
         agentId: agent._id.toString(),

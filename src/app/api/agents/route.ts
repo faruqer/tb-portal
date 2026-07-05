@@ -1,15 +1,14 @@
 import { NextRequest } from 'next/server';
-import { connectDB } from '@/lib/mongodb';
+import { getModels } from '@/lib/mongodb';
 import { getSession, hashPassword } from '@/lib/auth';
 import { jsonOk, jsonError, requireAdmin, serializeDoc } from '@/lib/api-utils';
-import { Agent } from '@/models/Agent';
 
 export async function GET() {
   const session = await getSession();
   const denied = requireAdmin(session);
   if (denied) return denied;
 
-  await connectDB();
+  const { Agent } = await getModels();
   const agents = await Agent.find().sort({ name: 1 });
   return jsonOk(agents.map((a) => ({ ...serializeDoc(a.toObject()), passwordHash: undefined })));
 }
@@ -26,7 +25,7 @@ export async function POST(req: NextRequest) {
     return jsonError('Name, username, and password are required');
   }
 
-  await connectDB();
+  const { Agent } = await getModels();
   const existing = await Agent.findOne({ username: String(username).toLowerCase().trim() });
   if (existing) return jsonError('Username already exists');
 

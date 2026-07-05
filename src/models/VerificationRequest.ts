@@ -1,6 +1,6 @@
-import mongoose, { Schema, models, model } from 'mongoose';
+import mongoose, { Schema, type Connection } from 'mongoose';
 
-const VerificationRequestSchema = new Schema(
+export const VerificationRequestSchema = new Schema(
   {
     gameId: { type: Schema.Types.ObjectId, ref: 'Game', required: true, index: true },
     agentId: { type: Schema.Types.ObjectId, ref: 'Agent', required: true, index: true },
@@ -14,4 +14,6 @@ export type VerificationRequestDoc = mongoose.InferSchemaType<typeof Verificatio
   _id: mongoose.Types.ObjectId;
 };
 
-export const VerificationRequest = models.VerificationRequest || model('VerificationRequest', VerificationRequestSchema);
+export function getVerificationRequestModel(conn: Connection) {
+  return conn.models.VerificationRequest || conn.model('VerificationRequest', VerificationRequestSchema);
+}

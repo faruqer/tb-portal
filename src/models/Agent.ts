@@ -1,6 +1,6 @@
-import mongoose, { Schema, models, model } from 'mongoose';
+import mongoose, { Schema, type Connection } from 'mongoose';
 
-const AgentSchema = new Schema(
+export const AgentSchema = new Schema(
   {
     legacyId: { type: String, index: true },
     name: { type: String, required: true, trim: true },
@@ -12,4 +12,6 @@ const AgentSchema = new Schema(
 
 export type AgentDoc = mongoose.InferSchemaType<typeof AgentSchema> & { _id: mongoose.Types.ObjectId };
 
-export const Agent = models.Agent || model('Agent', AgentSchema);
+export function getAgentModel(conn: Connection) {
+  return conn.models.Agent || conn.model('Agent', AgentSchema);
+}

@@ -1,16 +1,31 @@
 import { NextRequest } from 'next/server';
-import { connectDB } from '@/lib/mongodb';
+import { getModels } from '@/lib/mongodb';
 import { getSession } from '@/lib/auth';
 import { parseSessionId, normalizeGroupId } from '@/lib/calculations';
 import { jsonOk, jsonError, requireAdmin, serializeDoc } from '@/lib/api-utils';
-import { buildPlayDateMap, computeSimDates, getAvailableSims, getNextSessionId } from '@/lib/sim-service';
-import { SimCard } from '@/models/SimCard';
+import { buildPlayDateMap, enrichSimWithDates, getAvailableSims, getNextSessionId } from '@/lib/sim-service';
+
+function mapSimResponse(
+  obj: Record<string, unknown>,
+  agentId: string,
+  playMap: Map<string, Date>
+) {
+  const agent = obj.agentId as { _id?: { toString(): string }; name?: string };
+  const aid = agent?._id?.toString?.() ?? agentId;
+  const dates = enrichSimWithDates(aid, obj as never, playMap);
+  return {
+    ...serializeDoc(obj as never),
+    agentId: aid,
+    agentName: agent?.name,
+    groupId: obj.groupId ?? null,
+    ...dates,
+  };
+}
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return jsonError('Unauthorized', 401);
 
-  await connectDB();
   const { searchParams } = new URL(req.url);
   const availableOnly = searchParams.get('available') === 'true';
   const agentId = searchParams.get('agentId');
@@ -24,18 +39,12 @@ export async function GET(req: NextRequest) {
         const obj = s.toObject();
         const agent = obj.agentId as { _id?: { toString(): string }; name?: string };
         const aid = agent?._id?.toString?.() ?? obj.agentId?.toString?.();
-        const dates = computeSimDates(aid, obj.sessionId, playMap);
-        return {
-          ...serializeDoc(obj),
-          agentId: aid,
-          agentName: agent?.name,
-          groupId: obj.groupId ?? null,
-          ...dates,
-        };
+        return mapSimResponse(obj as never, aid, playMap);
       })
     );
   }
 
+  const { SimCard } = await getModels();
   const filter: Record<string, unknown> = {};
   if (session.role === 'agent') {
     filter.agentId = session.agentId;
@@ -53,14 +62,7 @@ export async function GET(req: NextRequest) {
       const obj = s.toObject();
       const agent = obj.agentId as { _id?: { toString(): string }; name?: string };
       const aid = agent?._id?.toString?.() ?? obj.agentId?.toString?.();
-      const dates = computeSimDates(aid, obj.sessionId, playMap);
-      return {
-        ...serializeDoc(obj),
-        agentId: aid,
-        agentName: agent?.name,
-        groupId: obj.groupId ?? null,
-        ...dates,
-      };
+      return mapSimResponse(obj as never, aid, playMap);
     })
   );
 }
@@ -77,11 +79,11 @@ export async function POST(req: NextRequest) {
     return jsonError('Agent and phone number are required');
   }
 
-  await connectDB();
-
-  let sid = sessionId !== undefined && sessionId !== null && sessionId !== ''
-    ? parseSessionId(sessionId)
-    : await getNextSessionId(agentId);
+  const { SimCard } = await getModels();
+  const sid =
+    sessionId !== undefined && sessionId !== null && sessionId !== ''
+      ? parseSessionId(sessionId)
+      : await getNextSessionId(agentId);
 
   const sim = await SimCard.create({
     agentId,

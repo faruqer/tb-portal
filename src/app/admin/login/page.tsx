@@ -1,5 +1,5 @@
-import { LoginForm } from '@/components/LoginForm';
+import { redirect } from 'next/navigation';
 
-export default function AdminLoginPage() {
-  return <LoginForm role="admin" title="Admin Sign In" subtitle="Manage games, agents, and payments" redirectTo="/games" />;
+export default function AdminLoginRedirect() {
+  redirect('/login');
 }

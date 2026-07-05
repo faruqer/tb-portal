@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { agentLinks } from '@/components/NavBar';
 import { PhoneReveal } from '@/components/PhoneReveal';
+import { PhoneRevealProvider, ShowAllNumbersButton } from '@/components/PhoneRevealContext';
 import { useSession, apiFetch } from '@/lib/hooks';
 import { formatDateTime } from '@/lib/calculations';
 import { sortSims, groupColorClass } from '@/lib/sort-sims';
@@ -29,46 +30,51 @@ export default function AgentNumbersPage() {
   if (loading) return <div className="loading-screen">Loading…</div>;
 
   return (
-    <AppShell
-      links={agentLinks}
-      userLabel={session?.agentName || 'Agent'}
-      logoutRedirect="/login"
-      brandHref="/agent/games"
-      title="My Numbers"
-      subtitle="SIM cards assigned to you"
-      actions={
-        <select value={sortMode} onChange={(e) => setSortMode(e.target.value as SimSortMode)} style={{ width: 'auto' }}>
-          <option value="ascending">Session ascending</option>
-          <option value="grouped">By group</option>
-        </select>
-      }
-    >
-      <div className="card">
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr><th>Session</th><th>Phone</th><th>Group</th><th>Last Played</th><th>Next Play</th></tr>
-            </thead>
-            <tbody>
-              {sorted.length === 0 ? (
-                <tr><td colSpan={5} className="empty-state">No SIM cards assigned</td></tr>
-              ) : (
-                sorted.map((s) => (
-                  <tr key={s.id} className={groupColorClass(s.groupId)}>
-                    <td><strong>{s.sessionId}</strong></td>
-                    <td><PhoneReveal phone={s.phoneNumber} /></td>
-                    <td>{s.groupId ? <span className="badge-group">{s.groupId}</span> : '—'}</td>
-                    <td>{s.lastPlayedDate || '—'}</td>
-                    <td>
-                      {s.isAvailable ? 'Ready' : formatDateTime(s.nextPlayingAt)}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+    <PhoneRevealProvider>
+      <AppShell
+        links={agentLinks}
+        userLabel={session?.agentName || 'Agent'}
+        logoutRedirect="/login"
+        brandHref="/agent/games"
+        title="My Numbers"
+        subtitle="SIM cards assigned to you"
+        actions={
+          <>
+            <ShowAllNumbersButton />
+            <select value={sortMode} onChange={(e) => setSortMode(e.target.value as SimSortMode)} style={{ width: 'auto' }}>
+              <option value="ascending">Session ascending</option>
+              <option value="grouped">By group</option>
+            </select>
+          </>
+        }
+      >
+        <div className="card">
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr><th>Session</th><th>Phone</th><th>Group</th><th>Last Played</th><th>Next Play</th></tr>
+              </thead>
+              <tbody>
+                {sorted.length === 0 ? (
+                  <tr><td colSpan={5} className="empty-state">No SIM cards assigned</td></tr>
+                ) : (
+                  sorted.map((s) => (
+                    <tr key={s.id} className={groupColorClass(s.groupId)}>
+                      <td><strong>{s.sessionId}</strong></td>
+                      <td><PhoneReveal phone={s.phoneNumber} /></td>
+                      <td>{s.groupId ? <span className="badge-group">{s.groupId}</span> : '—'}</td>
+                      <td>{s.lastPlayedDate || '—'}</td>
+                      <td>
+                        {s.isAvailable ? 'Ready' : formatDateTime(s.nextPlayingAt)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    </AppShell>
+      </AppShell>
+    </PhoneRevealProvider>
   );
 }

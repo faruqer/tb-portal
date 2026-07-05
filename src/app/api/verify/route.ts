@@ -1,17 +1,15 @@
 import { NextRequest } from 'next/server';
-import { connectDB } from '@/lib/mongodb';
+import { getModels } from '@/lib/mongodb';
 import { getSession } from '@/lib/auth';
 import { roundAmount } from '@/lib/calculations';
 import { jsonOk, jsonError, requireAdmin, serializeDoc } from '@/lib/api-utils';
-import { VerificationRequest } from '@/models/VerificationRequest';
-import { Game } from '@/models/Game';
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
   const denied = requireAdmin(session);
   if (denied) return denied;
 
-  await connectDB();
+  const { VerificationRequest } = await getModels();
   const { searchParams } = new URL(req.url);
   const agentId = searchParams.get('agentId');
 
@@ -48,7 +46,7 @@ export async function PUT(req: NextRequest) {
   const { id, action, received } = body || {};
   if (!id || !action) return jsonError('id and action required');
 
-  await connectDB();
+  const { VerificationRequest, Game } = await getModels();
   const request = await VerificationRequest.findById(id);
   if (!request) return jsonError('Request not found', 404);
 

@@ -1,51 +1,46 @@
 import { NextRequest } from 'next/server';
-import { connectDB } from '@/lib/mongodb';
+import { getGameKey } from '@/lib/game-context';
 import {
   createToken,
   setSessionCookie,
   clearSessionCookie,
   verifyAdmin,
+  verifyAgentCredentials,
   getSession,
-  comparePassword,
 } from '@/lib/auth';
 import { jsonOk, jsonError } from '@/lib/api-utils';
-import { Agent } from '@/models/Agent';
+import { getGameLabel } from '@/lib/games';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { username, password, role } = body || {};
+  const { username, password } = body || {};
 
   if (!username || !password) {
     return jsonError('Username and password are required', 400);
   }
 
-  if (role === 'admin') {
-    const valid = await verifyAdmin(String(username), String(password));
-    if (!valid) return jsonError('Invalid credentials', 401);
+  const creds = { u: String(username), p: String(password) };
 
-    const token = await createToken({ role: 'admin', username: String(username) });
+  if (await verifyAdmin(creds.u, creds.p)) {
+    const token = await createToken({ role: 'admin', username: creds.u });
     await setSessionCookie(token);
-    return jsonOk({ ok: true, role: 'admin' });
+    const gameKey = await getGameKey();
+    return jsonOk({ ok: true, role: 'admin', game: gameKey, gameLabel: getGameLabel(gameKey) });
   }
 
-  await connectDB();
-  const login = String(username).toLowerCase().trim();
-  const agent = await Agent.findOne({
-    $or: [{ username: login }, { name: { $regex: new RegExp(`^${login.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }],
-  });
-  if (!agent) return jsonError('Invalid credentials', 401);
+  const agent = await verifyAgentCredentials(creds.u, creds.p);
+  if (agent) {
+    const token = await createToken({
+      role: 'agent',
+      username: agent.username,
+      agentName: agent.agentName,
+    });
+    await setSessionCookie(token);
+    const gameKey = await getGameKey();
+    return jsonOk({ ok: true, role: 'agent', agentName: agent.agentName, game: gameKey, gameLabel: getGameLabel(gameKey) });
+  }
 
-  const valid = await comparePassword(String(password), agent.passwordHash);
-  if (!valid) return jsonError('Invalid credentials', 401);
-
-  const token = await createToken({
-    role: 'agent',
-    username: agent.username,
-    agentId: agent._id.toString(),
-    agentName: agent.name,
-  });
-  await setSessionCookie(token);
-  return jsonOk({ ok: true, role: 'agent', agentName: agent.name });
+  return jsonError('Invalid credentials', 401);
 }
 
 export async function DELETE() {
@@ -56,5 +51,6 @@ export async function DELETE() {
 export async function GET() {
   const session = await getSession();
   if (!session) return jsonError('Unauthorized', 401);
-  return jsonOk({ ok: true, ...session });
+  const gameKey = await getGameKey();
+  return jsonOk({ ok: true, ...session, game: gameKey, gameLabel: getGameLabel(gameKey) });
 }

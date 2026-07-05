@@ -14,7 +14,7 @@ export function useSession(requiredRole?: 'admin' | 'agent') {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!data) {
-          router.replace(requiredRole === 'agent' ? '/login' : '/admin/login');
+          router.replace('/login');
           return;
         }
         if (requiredRole && data.role !== requiredRole) {
@@ -24,7 +24,7 @@ export function useSession(requiredRole?: 'admin' | 'agent') {
         setSession(data);
         setLoading(false);
       })
-      .catch(() => router.replace(requiredRole === 'agent' ? '/login' : '/admin/login'));
+      .catch(() => router.replace('/login'));
   }, [requiredRole, router]);
 
   return { session, loading };

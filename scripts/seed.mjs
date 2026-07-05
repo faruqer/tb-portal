@@ -6,8 +6,26 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/reward-manager';
 const AGENT_PASSWORD = 'agent123';
+
+const DATABASES = [
+  { label: '35K Win', name: process.env.MONGODB_DB_35K || 'reward-manager' },
+  { label: '20K Win', name: process.env.MONGODB_DB_20K || 'reward-manager-20k' },
+];
+
+function getMongoUri(dbName) {
+  const base = process.env.MONGODB_URI || 'mongodb://localhost:27017/reward-manager';
+  if (base.includes('mongodb+srv://') || base.includes('mongodb://')) {
+    const [withoutQuery, query = ''] = base.split('?');
+    const slash = withoutQuery.lastIndexOf('/');
+    if (slash > 'mongodb://'.length) {
+      const prefix = withoutQuery.slice(0, slash + 1);
+      return query ? `${prefix}${dbName}?${query}` : `${prefix}${dbName}`;
+    }
+    return query ? `${withoutQuery}/${dbName}?${query}` : `${withoutQuery}/${dbName}`;
+  }
+  return base;
+}
 
 const AgentSchema = new mongoose.Schema(
   { name: String, username: String, passwordHash: String },
@@ -245,9 +263,10 @@ function buildGamesForAgent(agentKey) {
   return templates[agentKey] || [];
 }
 
-async function main() {
+async function seedDatabase({ label, name }) {
+  console.log(`\n=== Seeding ${label} (${name}) ===`);
   console.log('Connecting to MongoDB...');
-  await mongoose.connect(MONGODB_URI);
+  await mongoose.connect(getMongoUri(name));
 
   console.log('Clearing existing data...');
   await Promise.all([
@@ -329,7 +348,6 @@ async function main() {
     verifyCount++;
   }
 
-  // Add some approved/rejected history
   const paidGames = await Game.find({ paymentStatus: 'paid' }).limit(6);
   for (let i = 0; i < paidGames.length; i++) {
     await VerificationRequest.create({
@@ -357,15 +375,22 @@ async function main() {
   const todayGames = await Game.countDocuments({ date: daysAgo(0) });
   const activeGames = await Game.countDocuments({ completed: 'pending' });
 
-  console.log('\n--- Seed complete ---');
+  console.log(`--- ${label} seed complete ---`);
   console.log(`Agents:     ${AGENTS.length} (password: ${AGENT_PASSWORD})`);
   console.log(`SIM cards:  ${simCount}`);
   console.log(`Games:      ${gameCount} (${todayGames} today, ${activeGames} active)`);
   console.log(`Verify:     ${verifyCount} (${pendingVerifyGames.length} pending)`);
-  console.log('\nLogin as admin: admin / admin1001');
-  console.log('Login as agent: m / agent123 (or any agent username)');
 
   await mongoose.disconnect();
+}
+
+async function main() {
+  for (const db of DATABASES) {
+    await seedDatabase(db);
+  }
+
+  console.log('\nLogin as admin: admin / admin1001');
+  console.log('Login as agent: m / agent123 (or any agent username)');
 }
 
 main().catch((e) => {

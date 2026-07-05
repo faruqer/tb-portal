@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { adminLinks } from '@/components/NavBar';
 import { PhoneReveal } from '@/components/PhoneReveal';
+import { PhoneRevealProvider, ShowAllNumbersButton } from '@/components/PhoneRevealContext';
 import { useSession, apiFetch } from '@/lib/hooks';
 import { formatDateTime } from '@/lib/calculations';
 import { sortSims, groupColorClass } from '@/lib/sort-sims';
+import type { SimSortMode } from '@/lib/types';
 
 interface Agent { id: string; name: string; }
 
@@ -22,17 +24,45 @@ interface SimSummary {
   free: number;
 }
 
+function SimTable({ sims, emptyMessage }: { sims: Sim[]; emptyMessage: string }) {
+  if (sims.length === 0) {
+    return <div className="empty-state">{emptyMessage}</div>;
+  }
+  return (
+    <div className="table-wrap">
+      <table className="data-table">
+        <thead>
+          <tr><th>Agent</th><th>Session</th><th>Phone</th><th>Group</th><th>Last Played</th><th>Next Play</th></tr>
+        </thead>
+        <tbody>
+          {sims.map((s) => (
+            <tr key={s.id} className={groupColorClass(s.groupId)}>
+              <td>{s.agentName}</td>
+              <td><strong>{s.sessionId}</strong></td>
+              <td><PhoneReveal phone={s.phoneNumber} /></td>
+              <td>{s.groupId ? <span className="badge-group">{s.groupId}</span> : '—'}</td>
+              <td>{s.lastPlayedDate || 'Never'}</td>
+              <td>{s.isAvailable ? 'Ready' : formatDateTime(s.nextPlayingAt)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function AvailablePage() {
   const { loading } = useSession('admin');
   const [agents, setAgents] = useState<Agent[]>([]);
   const [sims, setSims] = useState<Sim[]>([]);
   const [simSummary, setSimSummary] = useState<SimSummary>({ total: 0, inUse: 0, free: 0 });
   const [filterAgent, setFilterAgent] = useState('');
+  const [sortMode, setSortMode] = useState<SimSortMode>('ascending');
 
   const load = useCallback(async () => {
     const [agentsData, simsData, summary] = await Promise.all([
       apiFetch<Agent[]>('/api/agents'),
-      apiFetch<Sim[]>('/api/sims?available=true'),
+      apiFetch<Sim[]>('/api/sims'),
       apiFetch<SimSummary>('/api/summary?type=sims'),
     ]);
     setAgents(agentsData);
@@ -45,63 +75,76 @@ export default function AvailablePage() {
   const filtered = useMemo(() => {
     let list = sims;
     if (filterAgent) list = list.filter((s) => s.agentId === filterAgent);
-    return sortSims(list, 'by-agent-group');
+    return list;
   }, [sims, filterAgent]);
+
+  const availableSims = useMemo(
+    () => sortSims(filtered.filter((s) => s.isAvailable), sortMode),
+    [filtered, sortMode]
+  );
+
+  const waitingSims = useMemo(
+    () => sortSims(filtered.filter((s) => !s.isAvailable && s.lastPlayedDate), sortMode),
+    [filtered, sortMode]
+  );
+
+  const sortLabel = sortMode === 'grouped' ? 'by group, then ascending' : 'session ID ascending';
 
   if (loading) return <div className="loading-screen">Loading…</div>;
 
   return (
-    <AppShell
-      links={adminLinks}
-      userLabel="Admin"
-      title="Available SIMs"
-      subtitle="Cards ready to play — updated automatically when winnings are added"
-      actions={
-        <div className="sim-summary-badges">
-          <span className="badge badge-muted">Total {simSummary.total}</span>
-          <span className="badge badge-warning">In use {simSummary.inUse}</span>
-          <span className="badge badge-success">Available {simSummary.free}</span>
-        </div>
-      }
-    >
-      <div className="card-stack">
-        <div className="card">
-          <div className="field" style={{ margin: 0, maxWidth: '320px' }}>
-            <label className="label">Agent</label>
-            <select value={filterAgent} onChange={(e) => setFilterAgent(e.target.value)}>
-              <option value="">All agents</option>
-              {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
+    <PhoneRevealProvider>
+      <AppShell
+        links={adminLinks}
+        userLabel="Admin"
+        title="Available SIMs"
+        subtitle="Cards ready to play — updated automatically when winnings are added"
+        actions={
+          <div className="sim-summary-badges">
+            <ShowAllNumbersButton />
+            <span className="badge badge-muted">Total {simSummary.total}</span>
+            <span className="badge badge-warning">In use {simSummary.inUse}</span>
+            <span className="badge badge-success">Available {simSummary.free}</span>
+          </div>
+        }
+      >
+        <div className="card-stack">
+          <div className="card">
+            <div className="two-col form-grid">
+              <div className="field" style={{ margin: 0 }}>
+                <label className="label">Agent</label>
+                <select value={filterAgent} onChange={(e) => setFilterAgent(e.target.value)}>
+                  <option value="">All agents</option>
+                  {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label className="label">Sort SIM cards</label>
+                <select value={sortMode} onChange={(e) => setSortMode(e.target.value as SimSortMode)}>
+                  <option value="ascending">Session ID ascending</option>
+                  <option value="grouped">By group, then ascending</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h3>Ready to play</h3>
+              <span className="badge badge-muted">{availableSims.length} · {sortLabel}</span>
+            </div>
+            <SimTable sims={availableSims} emptyMessage="No available SIM cards right now" />
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h3>Waiting for 7-day cooldown</h3>
+              <span className="badge badge-warning">{waitingSims.length} · {sortLabel}</span>
+            </div>
+            <SimTable sims={waitingSims} emptyMessage="No SIM cards on cooldown" />
           </div>
         </div>
-        <div className="card">
-          <div className="card-header">
-            <h3>Ready to play</h3>
-            <span className="badge badge-muted">{filtered.length} shown · sorted by agent, then group</span>
-          </div>
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead><tr><th>Agent</th><th>Session</th><th>Phone</th><th>Group</th><th>Last Played</th><th>Next Play</th></tr></thead>
-              <tbody>
-                {filtered.length === 0 ? (
-                  <tr><td colSpan={6} className="empty-state">No available SIM cards right now</td></tr>
-                ) : (
-                  filtered.map((s) => (
-                    <tr key={s.id} className={groupColorClass(s.groupId)}>
-                      <td>{s.agentName}</td>
-                      <td><strong>{s.sessionId}</strong></td>
-                      <td><PhoneReveal phone={s.phoneNumber} /></td>
-                      <td>{s.groupId ? <span className="badge-group">{s.groupId}</span> : '—'}</td>
-                      <td>{s.lastPlayedDate || 'Never'}</td>
-                      <td>{s.isAvailable ? 'Ready' : formatDateTime(s.nextPlayingAt)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </AppShell>
+      </AppShell>
+    </PhoneRevealProvider>
   );
 }

@@ -1,27 +1,37 @@
-import mongoose from 'mongoose';
+import mongoose, { type Connection } from 'mongoose';
+import { getGameKey } from '@/lib/game-context';
+import { getMongoUri, type GameKey } from '@/lib/games';
+import { getAgentModel } from '@/models/Agent';
+import { getGameModel } from '@/models/Game';
+import { getSimCardModel } from '@/models/SimCard';
+import { getVerificationRequestModel } from '@/models/VerificationRequest';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/reward-manager';
+const connectionMap = new Map<GameKey, Connection>();
 
-interface MongooseCache {
-  conn: typeof mongoose | null;
-  promise: Promise<typeof mongoose> | null;
+export async function connectDB(forGame?: GameKey): Promise<Connection> {
+  const gameKey = forGame ?? (await getGameKey());
+
+  const existing = connectionMap.get(gameKey);
+  if (existing?.readyState === 1) return existing;
+
+  const conn = mongoose.createConnection(getMongoUri(gameKey), { bufferCommands: false });
+  await conn.asPromise();
+
+  getAgentModel(conn);
+  getGameModel(conn);
+  getSimCardModel(conn);
+  getVerificationRequestModel(conn);
+
+  connectionMap.set(gameKey, conn);
+  return conn;
 }
 
-declare global {
-  // eslint-disable-next-line no-var
-  var mongooseCache: MongooseCache | undefined;
-}
-
-const cached: MongooseCache = global.mongooseCache ?? { conn: null, promise: null };
-global.mongooseCache = cached;
-
-export async function connectDB() {
-  if (cached.conn) return cached.conn;
-
-  if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI, { bufferCommands: false });
-  }
-
-  cached.conn = await cached.promise;
-  return cached.conn;
+export async function getModels(forGame?: GameKey) {
+  const conn = await connectDB(forGame);
+  return {
+    Agent: getAgentModel(conn),
+    Game: getGameModel(conn),
+    SimCard: getSimCardModel(conn),
+    VerificationRequest: getVerificationRequestModel(conn),
+  };
 }

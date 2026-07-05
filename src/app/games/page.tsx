@@ -47,9 +47,11 @@ function blurCommit(commit: () => void, skipBlurRef: React.MutableRefObject<bool
 function GameRow({
   game,
   onUpdate,
+  onDelete,
 }: {
   game: Game;
   onUpdate: (id: string, updates: Record<string, unknown>) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
   const skipBlur = useRef(false);
   const [won, setWon] = useState(amountInput(game.wonProfit));
@@ -122,6 +124,9 @@ function GameRow({
           onBlur={() => blurCommit(commitExpected, skipBlur)}
         />
       </td>
+      <td>
+        <button type="button" className="btn-danger btn-sm" onClick={() => onDelete(game.id)}>Delete</button>
+      </td>
     </tr>
   );
 }
@@ -181,6 +186,17 @@ export default function AdminGamesPage() {
     await load();
   }, [load]);
 
+  const deleteGame = useCallback(async (id: string) => {
+    if (!confirm('Delete this game?')) return;
+    await apiFetch(`/api/games/${id}`, { method: 'DELETE' });
+    await load();
+  }, [load]);
+
+  const agentsWithGames = useMemo(
+    () => agents.filter((a) => (gamesByAgent.get(a.id) || []).length > 0),
+    [agents, gamesByAgent]
+  );
+
   async function addGame(e: React.FormEvent) {
     e.preventDefault();
     const won = Number(form.wonProfit) || 0;
@@ -219,7 +235,12 @@ export default function AdminGamesPage() {
       }
     >
       <div className="card-stack">
-        {agents.map((agent) => {
+        {agentsWithGames.length === 0 ? (
+          <div className="card">
+            <div className="empty-state">No active games</div>
+          </div>
+        ) : (
+          agentsWithGames.map((agent) => {
           const agentGames = gamesByAgent.get(agent.id) || [];
           return (
             <div key={agent.id} className="card">
@@ -236,24 +257,20 @@ export default function AdminGamesPage() {
                       <th>Won</th>
                       <th>Net 75%</th>
                       <th>Expected</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {agentGames.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="empty-state">No active games</td>
-                      </tr>
-                    ) : (
-                      agentGames.map((g) => (
-                        <GameRow key={g.id} game={g} onUpdate={updateGame} />
-                      ))
-                    )}
+                    {agentGames.map((g) => (
+                      <GameRow key={g.id} game={g} onUpdate={updateGame} onDelete={deleteGame} />
+                    ))}
                   </tbody>
                 </table>
               </div>
             </div>
           );
-        })}
+        })
+        )}
       </div>
 
       <Modal

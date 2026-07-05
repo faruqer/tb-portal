@@ -2,6 +2,7 @@
 
 import { ReactNode } from 'react';
 import { NavBar, NavLink } from '@/components/NavBar';
+import { GameTabs } from '@/components/GameTabs';
 
 interface AppShellProps {
   links: NavLink[];
@@ -33,6 +34,7 @@ export function AppShell({
         brandHref={brandHref}
       />
       <div className="page-content">
+        <GameTabs />
         <div className="page-top">
           <div>
             <h1>{title}</h1>

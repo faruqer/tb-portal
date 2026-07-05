@@ -63,14 +63,24 @@ export interface SimComputed {
   isAvailable: boolean;
 }
 
+export interface SimDateOverrides {
+  lastPlayedAt?: Date | null;
+  nextPlayingAt?: Date | null;
+}
+
 export function computeSimDatesFromMap(
   agentId: string,
   sessionId: number,
-  playMap: Map<string, Date>
+  playMap: Map<string, Date>,
+  overrides?: SimDateOverrides
 ): SimComputed {
   const key = `${agentId}:${sessionId}`;
-  const lastPlayed = playMap.get(key) ?? null;
-  const nextPlaying = lastPlayed ? addDaysToDate(lastPlayed, NEXT_PLAY_DELAY_DAYS) : null;
+  const fromGame = playMap.get(key) ?? null;
+  const lastPlayed = overrides?.lastPlayedAt ?? fromGame;
+  let nextPlaying = overrides?.nextPlayingAt ?? null;
+  if (!nextPlaying && lastPlayed) {
+    nextPlaying = addDaysToDate(lastPlayed, NEXT_PLAY_DELAY_DAYS);
+  }
   const isAvailable = !lastPlayed || Date.now() >= (nextPlaying?.getTime() ?? 0);
 
   return {

@@ -26,6 +26,10 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const session = await getSessionFromRequest(req);
 
+  if (pathname === '/admin/login') {
+    return NextResponse.redirect(new URL('/login', req.url));
+  }
+
   if (pathname === '/login') {
     if (session?.role === 'agent') {
       return NextResponse.redirect(new URL('/agent/games', req.url));
@@ -36,18 +40,8 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname === '/admin/login') {
-    if (session?.role === 'admin') {
-      return NextResponse.redirect(new URL('/games', req.url));
-    }
-    if (session?.role === 'agent') {
-      return NextResponse.redirect(new URL('/agent/games', req.url));
-    }
-    return NextResponse.next();
-  }
-
   if (adminRoutes.some((r) => pathname === r || pathname.startsWith(`${r}/`))) {
-    if (!session) return NextResponse.redirect(new URL('/admin/login', req.url));
+    if (!session) return NextResponse.redirect(new URL('/login', req.url));
     if (session.role !== 'admin') return NextResponse.redirect(new URL('/agent/games', req.url));
   }
 

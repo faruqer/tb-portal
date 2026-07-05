@@ -1,13 +1,11 @@
 import { NextRequest } from 'next/server';
 import { readFile } from 'fs/promises';
 import path from 'path';
-import { connectDB } from '@/lib/mongodb';
+import { getModels } from '@/lib/mongodb';
 import { getSession, hashPassword } from '@/lib/auth';
+
 import { calcNetProfit, calcExpectedToReceive, parseSessionId } from '@/lib/calculations';
 import { jsonOk, jsonError, requireAdmin } from '@/lib/api-utils';
-import { Agent } from '@/models/Agent';
-import { Game } from '@/models/Game';
-import { SimCard } from '@/models/SimCard';
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -17,7 +15,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const dataDir = body.dataDir || path.join(process.cwd(), '..', 'data');
 
-  await connectDB();
+  const { Agent, Game, SimCard } = await getModels();
 
   const existingAgents = await Agent.countDocuments();
   if (existingAgents > 0 && !body.force) {

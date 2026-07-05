@@ -9,6 +9,7 @@
     "lint": "eslint",
     "migrate": "node scripts/migrate.mjs",
     "seed": "node scripts/seed.mjs",
+    "copy-db": "node scripts/copy-db.mjs",
     "reset-passwords": "node scripts/reset-agent-passwords.mjs"
   },
   "dependencies": {

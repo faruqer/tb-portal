@@ -1,14 +1,28 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
+import { getModels } from '@/lib/mongodb';
+import type { GameKey } from '@/lib/games';
 import type { SessionPayload } from './types';
 
 const COOKIE_NAME = 'rm_session';
 const SESSION_TTL = 60 * 60 * 8; // 8 hours
 
+const GAME_KEYS: GameKey[] = ['35k', '20k'];
+
 function getSecret() {
   const secret = process.env.JWT_SECRET || 'dev-secret-change-me';
   return new TextEncoder().encode(secret);
+}
+
+export function agentLoginFilter(login: string) {
+  const normalized = login.toLowerCase().trim();
+  return {
+    $or: [
+      { username: normalized },
+      { name: { $regex: new RegExp(`^${normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+    ],
+  };
 }
 
 export async function createToken(payload: SessionPayload): Promise<string> {
@@ -28,11 +42,54 @@ export async function verifyToken(token: string): Promise<SessionPayload | null>
   }
 }
 
+async function resolveAgentSession(payload: SessionPayload): Promise<SessionPayload | null> {
+  if (!payload.username) return null;
+
+  const { Agent } = await getModels();
+  const agent = await Agent.findOne(agentLoginFilter(payload.username));
+  if (!agent) return null;
+
+  return {
+    role: 'agent',
+    username: agent.username,
+    agentId: agent._id.toString(),
+    agentName: agent.name,
+  };
+}
+
+/** Session for the currently selected game (cookie). Login is shared across 35K and 20K. */
 export async function getSession(): Promise<SessionPayload | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (!token) return null;
-  return verifyToken(token);
+
+  const payload = await verifyToken(token);
+  if (!payload?.role) return null;
+
+  if (payload.role === 'admin') {
+    return { role: 'admin', username: payload.username };
+  }
+
+  if (payload.role === 'agent') {
+    return resolveAgentSession(payload);
+  }
+
+  return null;
+}
+
+export async function verifyAgentCredentials(
+  username: string,
+  password: string
+): Promise<{ username: string; agentName: string } | null> {
+  for (const gameKey of GAME_KEYS) {
+    const { Agent } = await getModels(gameKey);
+    const agent = await Agent.findOne(agentLoginFilter(username));
+    if (!agent) continue;
+    if (await comparePassword(password, agent.passwordHash)) {
+      return { username: agent.username, agentName: agent.name };
+    }
+  }
+  return null;
 }
 
 export async function setSessionCookie(token: string) {

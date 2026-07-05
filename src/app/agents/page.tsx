@@ -5,8 +5,8 @@ import { AppShell } from '@/components/AppShell';
 import { adminLinks } from '@/components/NavBar';
 import { Modal } from '@/components/Modal';
 import { PhoneReveal } from '@/components/PhoneReveal';
+import { PhoneRevealProvider, ShowAllNumbersButton } from '@/components/PhoneRevealContext';
 import { useSession, apiFetch } from '@/lib/hooks';
-import { formatDateTime } from '@/lib/calculations';
 import { sortSims, groupColorClass } from '@/lib/sort-sims';
 import type { SimSortMode } from '@/lib/types';
 
@@ -23,6 +23,7 @@ interface Sim {
   sessionId: number;
   groupId: string | null;
   lastPlayedDate: string | null;
+  lastPlayedAt: string | null;
   nextPlayingDate: string | null;
   nextPlayingAt: string | null;
   isAvailable: boolean;
@@ -127,13 +128,21 @@ export default function AgentsPage() {
     await load();
   }
 
-  async function updateSim(id: string, updates: Partial<Sim>) {
+  async function updateSim(id: string, updates: Record<string, unknown>) {
     await apiFetch(`/api/sims/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
     });
     await load();
+  }
+
+  function toLocalDatetime(iso: string | null): string {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
   async function deleteSim(id: string) {
@@ -145,6 +154,7 @@ export default function AgentsPage() {
   if (loading) return <div className="loading-screen">Loading…</div>;
 
   return (
+    <PhoneRevealProvider>
     <AppShell
       links={adminLinks}
       userLabel="Admin"
@@ -152,6 +162,7 @@ export default function AgentsPage() {
       subtitle="Manage agent profiles and SIM card inventory"
       actions={
         <>
+          <ShowAllNumbersButton />
           <button type="button" className="btn-secondary" onClick={() => setAgentModal(true)}>+ Agent</button>
           <button type="button" onClick={openSimModal} disabled={!selectedAgent}>+ SIM</button>
         </>
@@ -245,15 +256,33 @@ export default function AgentsPage() {
                         </datalist>
                         {s.groupId && <span className="badge-group">{s.groupId}</span>}
                       </td>
-                      <td>{s.lastPlayedDate || '—'}</td>
                       <td>
-                        {s.isAvailable ? (
-                          <span className="badge badge-success">Ready</span>
-                        ) : s.nextPlayingAt ? (
-                          <span className="badge badge-muted">{formatDateTime(s.nextPlayingAt)}</span>
-                        ) : (
-                          <span className="badge badge-muted">—</span>
-                        )}
+                        <input
+                          key={`last-${s.id}-${s.lastPlayedAt}`}
+                          type="datetime-local"
+                          className="inline-input datetime-input"
+                          defaultValue={toLocalDatetime(s.lastPlayedAt)}
+                          onBlur={(e) => {
+                            const iso = e.target.value ? new Date(e.target.value).toISOString() : null;
+                            if (iso !== (s.lastPlayedAt ?? null)) {
+                              updateSim(s.id, { lastPlayedAt: iso });
+                            }
+                          }}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          key={`next-${s.id}-${s.nextPlayingAt}`}
+                          type="datetime-local"
+                          className="inline-input datetime-input"
+                          defaultValue={toLocalDatetime(s.nextPlayingAt)}
+                          onBlur={(e) => {
+                            const iso = e.target.value ? new Date(e.target.value).toISOString() : null;
+                            if (iso !== (s.nextPlayingAt ?? null)) {
+                              updateSim(s.id, { nextPlayingAt: iso });
+                            }
+                          }}
+                        />
                       </td>
                       <td>
                         <button type="button" className="btn-danger btn-sm" onClick={() => deleteSim(s.id)}>×</button>
@@ -300,5 +329,6 @@ export default function AgentsPage() {
         </form>
       </Modal>
     </AppShell>
+    </PhoneRevealProvider>
   );
 }
