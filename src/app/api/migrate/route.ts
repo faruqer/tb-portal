@@ -5,6 +5,7 @@ import { getModels } from '@/lib/mongodb';
 import { getSession, hashPassword } from '@/lib/auth';
 
 import { calcNetProfit, calcExpectedToReceive, parseSessionId } from '@/lib/calculations';
+import { withGame, gameScope } from '@/lib/game-filter';
 import { jsonOk, jsonError, requireAdmin } from '@/lib/api-utils';
 
 export async function POST(req: NextRequest) {
@@ -16,8 +17,9 @@ export async function POST(req: NextRequest) {
   const dataDir = body.dataDir || path.join(process.cwd(), '..', 'data');
 
   const { Agent, Game, SimCard } = await getModels();
+  const scope = await gameScope();
 
-  const existingAgents = await Agent.countDocuments();
+  const existingAgents = await Agent.countDocuments(await withGame());
   if (existingAgents > 0 && !body.force) {
     return jsonError('Database already has data. Pass force:true to re-import.');
   }
@@ -37,7 +39,12 @@ export async function POST(req: NextRequest) {
   const simsJson = JSON.parse(simsRaw) as Record<string, unknown>[];
 
   if (body.force) {
-    await Promise.all([Agent.deleteMany({}), Game.deleteMany({}), SimCard.deleteMany({})]);
+    const gameFilter = await withGame();
+    await Promise.all([
+      Agent.deleteMany(gameFilter),
+      Game.deleteMany(gameFilter),
+      SimCard.deleteMany(gameFilter),
+    ]);
   }
 
   const agentMap = new Map<string, string>();
@@ -49,6 +56,7 @@ export async function POST(req: NextRequest) {
       name: a.name,
       username,
       passwordHash: await hashPassword('changeme123'),
+      ...scope,
     });
     agentMap.set(a.id, agent._id.toString());
   }
@@ -77,6 +85,7 @@ export async function POST(req: NextRequest) {
       completed: g.completed === 'completed' ? 'completed' : 'pending',
       paymentStatus: Number(g.received) > 0 ? 'paid' : 'unpaid',
       createdAt: g.createdAt ? new Date(String(g.createdAt)) : new Date(),
+      ...scope,
     });
   }
 
@@ -90,10 +99,8 @@ export async function POST(req: NextRequest) {
       agentId,
       phoneNumber: String(s.phoneNumber || ''),
       sessionId: parseSessionId(String(s.profileName || '0')),
-      inUse: Boolean(s.inUse),
-      inUseSetAt: s.inUseSetAt ? new Date(String(s.inUseSetAt)) : null,
-      markedSameId: false,
       createdAt: s.createdAt ? new Date(String(s.createdAt)) : new Date(),
+      ...scope,
     });
   }
 

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { getModels } from '@/lib/mongodb';
 import { getSession } from '@/lib/auth';
 import { calcNetProfit, calcExpectedToReceive, parseSessionId } from '@/lib/calculations';
+import { withGame, gameScope } from '@/lib/game-filter';
 import { jsonOk, jsonError, requireAdmin, serializeDoc } from '@/lib/api-utils';
 import { getAgentSessionIds } from '@/lib/sim-service';
 
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
   if (completed === 'true') filter.completed = 'completed';
   if (completed === 'false') filter.completed = 'pending';
 
-  const games = await Game.find(filter).populate('agentId', 'name').sort({ date: -1, createdAt: -1 });
+  const games = await Game.find(await withGame(filter)).populate('agentId', 'name').sort({ date: -1, createdAt: -1 });
   return jsonOk(
     games.map((g) => {
       const obj = g.toObject();
@@ -73,6 +74,7 @@ export async function POST(req: NextRequest) {
     idStatus: 'pending',
     completed: 'pending',
     paymentStatus: 'unpaid',
+    ...(await gameScope()),
   });
 
   return jsonOk(serializeDoc(game.toObject()), 201);

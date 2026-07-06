@@ -1,12 +1,12 @@
 import { getModels } from '@/lib/mongodb';
+import { withGame } from '@/lib/game-filter';
 import { computeSimDatesFromMap, type SimComputed } from '@/lib/sort-sims';
 
 export type { SimComputed };
 
 export async function buildPlayDateMap(agentId?: string) {
   const { Game } = await getModels();
-  const filter: Record<string, unknown> = {};
-  if (agentId) filter.agentId = agentId;
+  const filter = await withGame(agentId ? { agentId } : {});
 
   const games = await Game.find(filter)
     .select('agentId sessionId date createdAt')
@@ -59,14 +59,14 @@ export function enrichSimWithDates(
 
 export async function getNextSessionId(agentId: string): Promise<number> {
   const { SimCard } = await getModels();
-  const latest = await SimCard.findOne({ agentId }).sort({ sessionId: -1 }).select('sessionId');
+  const filter = await withGame({ agentId });
+  const latest = await SimCard.findOne(filter).sort({ sessionId: -1 }).select('sessionId');
   return latest ? latest.sessionId + 1 : 1;
 }
 
 export async function getAvailableSims(agentId?: string) {
   const { SimCard } = await getModels();
-  const filter: Record<string, unknown> = {};
-  if (agentId) filter.agentId = agentId;
+  const filter = await withGame(agentId ? { agentId } : {});
 
   const [sims, playMap] = await Promise.all([
     SimCard.find(filter).populate('agentId', 'name').sort({ sessionId: 1 }),
@@ -82,6 +82,7 @@ export async function getAvailableSims(agentId?: string) {
 
 export async function getAgentSessionIds(agentId: string): Promise<number[]> {
   const { SimCard } = await getModels();
-  const sims = await SimCard.find({ agentId }).select('sessionId');
+  const filter = await withGame({ agentId });
+  const sims = await SimCard.find(filter).select('sessionId');
   return [...new Set(sims.map((s) => s.sessionId))].sort((a, b) => a - b);
 }

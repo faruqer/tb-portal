@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { getModels } from '@/lib/mongodb';
 import { getSession } from '@/lib/auth';
 import { parseSessionId, normalizeGroupId } from '@/lib/calculations';
+import { withGame, gameScope } from '@/lib/game-filter';
 import { jsonOk, jsonError, requireAdmin, serializeDoc } from '@/lib/api-utils';
 import { buildPlayDateMap, enrichSimWithDates, getAvailableSims, getNextSessionId } from '@/lib/sim-service';
 
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
   }
 
   const [sims, playMap] = await Promise.all([
-    SimCard.find(filter).populate('agentId', 'name').sort({ sessionId: 1 }),
+    SimCard.find(await withGame(filter)).populate('agentId', 'name').sort({ sessionId: 1 }),
     buildPlayDateMap(agentId || (session.role === 'agent' ? session.agentId : undefined)),
   ]);
 
@@ -90,6 +91,7 @@ export async function POST(req: NextRequest) {
     phoneNumber: String(phoneNumber).trim(),
     sessionId: sid,
     groupId: normalizeGroupId(groupId),
+    ...(await gameScope()),
   });
 
   return jsonOk(serializeDoc(sim.toObject()), 201);

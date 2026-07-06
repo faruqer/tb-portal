@@ -1,33 +1,28 @@
 import mongoose, { type Connection } from 'mongoose';
-import { getGameKey } from '@/lib/game-context';
-import { getMongoUri, type GameKey } from '@/lib/games';
+import { getMongoUri } from '@/lib/games';
 import { getAgentModel } from '@/models/Agent';
 import { getGameModel } from '@/models/Game';
 import { getSimCardModel } from '@/models/SimCard';
 import { getVerificationRequestModel } from '@/models/VerificationRequest';
 
-const connectionMap = new Map<GameKey, Connection>();
+let connection: Connection | null = null;
 
-export async function connectDB(forGame?: GameKey): Promise<Connection> {
-  const gameKey = forGame ?? (await getGameKey());
+export async function connectDB(): Promise<Connection> {
+  if (connection?.readyState === 1) return connection;
 
-  const existing = connectionMap.get(gameKey);
-  if (existing?.readyState === 1) return existing;
+  connection = mongoose.createConnection(getMongoUri(), { bufferCommands: false });
+  await connection.asPromise();
 
-  const conn = mongoose.createConnection(getMongoUri(gameKey), { bufferCommands: false });
-  await conn.asPromise();
+  getAgentModel(connection);
+  getGameModel(connection);
+  getSimCardModel(connection);
+  getVerificationRequestModel(connection);
 
-  getAgentModel(conn);
-  getGameModel(conn);
-  getSimCardModel(conn);
-  getVerificationRequestModel(conn);
-
-  connectionMap.set(gameKey, conn);
-  return conn;
+  return connection;
 }
 
-export async function getModels(forGame?: GameKey) {
-  const conn = await connectDB(forGame);
+export async function getModels() {
+  const conn = await connectDB();
   return {
     Agent: getAgentModel(conn),
     Game: getGameModel(conn),

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { getModels } from '@/lib/mongodb';
 import { getSession } from '@/lib/auth';
 import { calcNetProfit, calcExpectedToReceive } from '@/lib/calculations';
+import { withGame, gameScope } from '@/lib/game-filter';
 import { jsonOk, jsonError, requireAdmin, serializeDoc } from '@/lib/api-utils';
 
 type Params = { params: Promise<{ id: string }> };
@@ -14,7 +15,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const body = await req.json();
   const { Game, VerificationRequest } = await getModels();
 
-  const game = await Game.findById(id);
+  const game = await Game.findOne(await withGame({ _id: id }));
   if (!game) return jsonError('Game not found', 404);
 
   if (session.role === 'agent') {
@@ -32,7 +33,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       game.paymentStatus = 'pending_verify';
       await game.save();
 
-      const existing = await VerificationRequest.findOne({ gameId: id, status: 'pending' });
+      const existing = await VerificationRequest.findOne(await withGame({ gameId: id, status: 'pending' }));
       if (existing) {
         existing.amount = amount;
         await existing.save();
@@ -42,6 +43,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
           agentId: game.agentId,
           amount,
           status: 'pending',
+          ...(await gameScope()),
         });
       }
       return jsonOk(serializeDoc(game.toObject()));
@@ -78,6 +80,9 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const { Game, VerificationRequest } = await getModels();
-  await Promise.all([Game.findByIdAndDelete(id), VerificationRequest.deleteMany({ gameId: id })]);
+  await Promise.all([
+    Game.findOneAndDelete(await withGame({ _id: id })),
+    VerificationRequest.deleteMany(await withGame({ gameId: id })),
+  ]);
   return jsonOk({ ok: true });
 }

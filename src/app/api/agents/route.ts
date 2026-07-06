@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getModels } from '@/lib/mongodb';
 import { getSession, hashPassword } from '@/lib/auth';
+import { withGame, gameScope } from '@/lib/game-filter';
 import { jsonOk, jsonError, requireAdmin, serializeDoc } from '@/lib/api-utils';
 
 export async function GET() {
@@ -9,7 +10,7 @@ export async function GET() {
   if (denied) return denied;
 
   const { Agent } = await getModels();
-  const agents = await Agent.find().sort({ name: 1 });
+  const agents = await Agent.find(await withGame()).sort({ name: 1 });
   return jsonOk(agents.map((a) => ({ ...serializeDoc(a.toObject()), passwordHash: undefined })));
 }
 
@@ -26,13 +27,16 @@ export async function POST(req: NextRequest) {
   }
 
   const { Agent } = await getModels();
-  const existing = await Agent.findOne({ username: String(username).toLowerCase().trim() });
+  const normalized = String(username).toLowerCase().trim();
+  const scope = await gameScope();
+  const existing = await Agent.findOne({ username: normalized, gameType: scope.gameType });
   if (existing) return jsonError('Username already exists');
 
   const agent = await Agent.create({
     name: String(name).trim(),
-    username: String(username).toLowerCase().trim(),
+    username: normalized,
     passwordHash: await hashPassword(String(password)),
+    ...scope,
   });
 
   const obj = agent.toObject();

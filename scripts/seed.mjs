@@ -8,31 +8,18 @@ import bcrypt from 'bcryptjs';
 
 const AGENT_PASSWORD = 'agent123';
 
-const DATABASES = [
-  { label: '35K Win', name: process.env.MONGODB_DB_35K || 'reward-manager' },
-  { label: '20K Win', name: process.env.MONGODB_DB_20K || 'reward-manager-20k' },
+const GAME_TYPES = [
+  { key: '35k', label: '35K Win' },
+  { key: '20k', label: '20K Win' },
 ];
 
-function getMongoUri(dbName) {
-  const base = process.env.MONGODB_URI || 'mongodb://localhost:27017/reward-manager';
-  if (base.includes('mongodb+srv://') || base.includes('mongodb://')) {
-    const [withoutQuery, query = ''] = base.split('?');
-    const slash = withoutQuery.lastIndexOf('/');
-    if (slash > 'mongodb://'.length) {
-      const prefix = withoutQuery.slice(0, slash + 1);
-      return query ? `${prefix}${dbName}?${query}` : `${prefix}${dbName}`;
-    }
-    return query ? `${withoutQuery}/${dbName}?${query}` : `${withoutQuery}/${dbName}`;
-  }
-  return base;
-}
-
 const AgentSchema = new mongoose.Schema(
-  { name: String, username: String, passwordHash: String },
+  { gameType: String, name: String, username: String, passwordHash: String },
   { timestamps: true }
 );
 const GameSchema = new mongoose.Schema(
   {
+    gameType: String,
     gameName: String,
     sessionId: Number,
     agentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent' },
@@ -50,6 +37,7 @@ const GameSchema = new mongoose.Schema(
 );
 const SimCardSchema = new mongoose.Schema(
   {
+    gameType: String,
     agentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent' },
     phoneNumber: String,
     sessionId: Number,
@@ -59,6 +47,7 @@ const SimCardSchema = new mongoose.Schema(
 );
 const VerificationRequestSchema = new mongoose.Schema(
   {
+    gameType: String,
     gameId: { type: mongoose.Schema.Types.ObjectId, ref: 'Game' },
     agentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent' },
     status: String,
@@ -263,17 +252,15 @@ function buildGamesForAgent(agentKey) {
   return templates[agentKey] || [];
 }
 
-async function seedDatabase({ label, name }) {
-  console.log(`\n=== Seeding ${label} (${name}) ===`);
-  console.log('Connecting to MongoDB...');
-  await mongoose.connect(getMongoUri(name));
+async function seedGameType({ key, label }) {
+  console.log(`\n=== Seeding ${label} (${key}) ===`);
 
-  console.log('Clearing existing data...');
+  console.log(`Clearing existing ${key} data…`);
   await Promise.all([
-    Agent.deleteMany({}),
-    Game.deleteMany({}),
-    SimCard.deleteMany({}),
-    VerificationRequest.deleteMany({}),
+    Agent.deleteMany({ gameType: key }),
+    Game.deleteMany({ gameType: key }),
+    SimCard.deleteMany({ gameType: key }),
+    VerificationRequest.deleteMany({ gameType: key }),
   ]);
 
   const passwordHash = await bcrypt.hash(AGENT_PASSWORD, 10);
@@ -281,7 +268,7 @@ async function seedDatabase({ label, name }) {
 
   console.log('Creating agents...');
   for (const a of AGENTS) {
-    const doc = await Agent.create({ name: a.name, username: a.username, passwordHash });
+    const doc = await Agent.create({ name: a.name, username: a.username, passwordHash, gameType: key });
     agentDocs[a.username] = doc;
   }
 
@@ -295,6 +282,7 @@ async function seedDatabase({ label, name }) {
         phoneNumber: phone,
         sessionId,
         groupId: groupId || null,
+        gameType: key,
       });
       simCount++;
     }
@@ -324,6 +312,7 @@ async function seedDatabase({ label, name }) {
         idStatus,
         completed,
         paymentStatus,
+        gameType: key,
         createdAt: daysAgoDate(days),
       });
       gameCount++;
@@ -343,54 +332,60 @@ async function seedDatabase({ label, name }) {
       agentId,
       status: 'pending',
       amount: Number(submitted.toFixed(2)),
+      gameType: key,
       createdAt: new Date(),
     });
     verifyCount++;
   }
 
-  const paidGames = await Game.find({ paymentStatus: 'paid' }).limit(6);
+  const paidGames = await Game.find({ paymentStatus: 'paid', gameType: key }).limit(6);
   for (let i = 0; i < paidGames.length; i++) {
     await VerificationRequest.create({
       gameId: paidGames[i]._id,
       agentId: paidGames[i].agentId,
       status: 'approved',
       amount: paidGames[i].expectedToReceive,
+      gameType: key,
       createdAt: daysAgoDate(i + 3),
     });
     verifyCount++;
   }
 
-  const unpaidGames = await Game.find({ paymentStatus: 'unpaid' }).limit(2);
+  const unpaidGames = await Game.find({ paymentStatus: 'unpaid', gameType: key }).limit(2);
   for (const g of unpaidGames) {
     await VerificationRequest.create({
       gameId: g._id,
       agentId: g.agentId,
       status: 'rejected',
       amount: g.expectedToReceive,
+      gameType: key,
       createdAt: daysAgoDate(5),
     });
     verifyCount++;
   }
 
-  const todayGames = await Game.countDocuments({ date: daysAgo(0) });
-  const activeGames = await Game.countDocuments({ completed: 'pending' });
+  const todayGames = await Game.countDocuments({ date: daysAgo(0), gameType: key });
+  const activeGames = await Game.countDocuments({ completed: 'pending', gameType: key });
 
   console.log(`--- ${label} seed complete ---`);
   console.log(`Agents:     ${AGENTS.length} (password: ${AGENT_PASSWORD})`);
   console.log(`SIM cards:  ${simCount}`);
   console.log(`Games:      ${gameCount} (${todayGames} today, ${activeGames} active)`);
   console.log(`Verify:     ${verifyCount} (${pendingVerifyGames.length} pending)`);
-
-  await mongoose.disconnect();
 }
 
 async function main() {
-  for (const db of DATABASES) {
-    await seedDatabase(db);
+  console.log('Connecting to MongoDB...');
+  await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/reward-manager');
+
+  for (const game of GAME_TYPES) {
+    await seedGameType(game);
   }
 
   console.log('\nLogin as admin: admin / admin1001');
   console.log('Login as agent: m / agent123 (or any agent username)');
+
+  await mongoose.disconnect();
 }
 
 main().catch((e) => {

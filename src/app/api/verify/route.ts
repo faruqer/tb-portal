@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { getModels } from '@/lib/mongodb';
 import { getSession } from '@/lib/auth';
 import { roundAmount } from '@/lib/calculations';
+import { withGame } from '@/lib/game-filter';
 import { jsonOk, jsonError, requireAdmin, serializeDoc } from '@/lib/api-utils';
 
 export async function GET(req: NextRequest) {
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
   const filter: Record<string, unknown> = {};
   if (agentId) filter.agentId = agentId;
 
-  const requests = await VerificationRequest.find(filter)
+  const requests = await VerificationRequest.find(await withGame(filter))
     .populate('agentId', 'name')
     .populate('gameId')
     .sort({ createdAt: -1 });
@@ -47,10 +48,10 @@ export async function PUT(req: NextRequest) {
   if (!id || !action) return jsonError('id and action required');
 
   const { VerificationRequest, Game } = await getModels();
-  const request = await VerificationRequest.findById(id);
+  const request = await VerificationRequest.findOne(await withGame({ _id: id }));
   if (!request) return jsonError('Request not found', 404);
 
-  const game = await Game.findById(request.gameId);
+  const game = await Game.findOne(await withGame({ _id: request.gameId }));
   if (!game) return jsonError('Game not found', 404);
 
   if (action === 'approve') {

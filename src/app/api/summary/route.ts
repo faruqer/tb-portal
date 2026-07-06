@@ -5,6 +5,7 @@ import { jsonOk, requireAuth } from '@/lib/api-utils';
 import type { GameTotals } from '@/lib/types';
 import { addDaysStr } from '@/lib/calculations';
 import { resolveAgentId, emptyTotals, addToTotals } from '@/lib/game-utils';
+import { withGame } from '@/lib/game-filter';
 import { buildPlayDateMap, enrichSimWithDates } from '@/lib/sim-service';
 
 function getWeekStart(d: Date): string {
@@ -84,7 +85,7 @@ export async function GET(req: NextRequest) {
   }
   if (date) filter.date = date;
 
-  const games = await Game.find(filter).populate('agentId', 'name');
+  const games = await Game.find(await withGame(filter)).populate('agentId', 'name');
   const totals = sumGames(games);
 
   if (type === 'sims') {
@@ -92,7 +93,7 @@ export async function GET(req: NextRequest) {
     if (session!.role === 'agent') simFilter.agentId = session!.agentId;
     else if (agentId) simFilter.agentId = agentId;
 
-    const sims = await SimCard.find(simFilter);
+    const sims = await SimCard.find(await withGame(simFilter));
     const playMap = await buildPlayDateMap(
       agentId || (session!.role === 'agent' ? session!.agentId : undefined)
     );
@@ -105,8 +106,8 @@ export async function GET(req: NextRequest) {
   }
 
   if (type === 'agent-sims') {
-    const agents = await Agent.find().sort({ name: 1 });
-    const sims = await SimCard.find();
+    const agents = await Agent.find(await withGame()).sort({ name: 1 });
+    const sims = await SimCard.find(await withGame());
     const playMap = await buildPlayDateMap();
     const summary = agents.map((agent) => {
       const agentSims = sims.filter((s) => s.agentId.toString() === agent._id.toString());
@@ -175,7 +176,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (type === 'by-agent' && session!.role === 'admin') {
-    const agents = await Agent.find();
+    const agents = await Agent.find(await withGame());
     const byAgent = agents.map((agent) => {
       const agentIdStr = agent._id.toString();
       const agentGames = games.filter((g) => resolveAgentId(g.agentId) === agentIdStr);

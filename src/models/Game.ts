@@ -3,6 +3,7 @@ import mongoose, { Schema, type Connection } from 'mongoose';
 export const GameSchema = new Schema(
   {
     legacyId: { type: String, index: true },
+    gameType: { type: String, enum: ['35k', '20k'], required: true, default: '35k', index: true },
     gameName: { type: String, required: true, trim: true },
     sessionId: { type: Number, required: true, index: true },
     agentId: { type: Schema.Types.ObjectId, ref: 'Agent', required: true, index: true },
