@@ -135,6 +135,7 @@ export default function AdminGamesPage() {
   const { loading } = useSession('admin');
   const [agents, setAgents] = useState<Agent[]>([]);
   const [games, setGames] = useState<Game[]>([]);
+  const [todayStats, setTodayStats] = useState({ wonToday: 0, expectedToday: 0, totalSims: 0 });
   const [modalOpen, setModalOpen] = useState(false);
   const [sessions, setSessions] = useState<number[]>([]);
   const [form, setForm] = useState({
@@ -145,12 +146,16 @@ export default function AdminGamesPage() {
   });
 
   const load = useCallback(async () => {
-    const [agentsData, gamesData] = await Promise.all([
+  const [agentsData, gamesData, todayData] = await Promise.all([
       apiFetch<Agent[]>('/api/agents'),
       apiFetch<Game[]>('/api/games?completed=false'),
+      apiFetch<{ wonToday: number; expectedToday: number; totalSims: number }>(
+        '/api/summary?type=today-progress'
+      ),
     ]);
     setAgents(agentsData);
     setGames(gamesData);
+    setTodayStats(todayData);
   }, []);
 
   useEffect(() => {
@@ -162,7 +167,7 @@ export default function AdminGamesPage() {
       setSessions([]);
       return;
     }
-    apiFetch<number[]>(`/api/agents/${form.agentId}/sessions`)
+    apiFetch<number[]>(`/api/agents/${form.agentId}/sessions?available=true`)
       .then(setSessions)
       .catch(() => setSessions([]));
   }, [form.agentId]);
@@ -229,9 +234,21 @@ export default function AdminGamesPage() {
       title="Games"
       subtitle="Track active winnings per agent"
       actions={
-        <button type="button" onClick={() => setModalOpen(true)}>
-          + Add Winning
-        </button>
+        <div className="games-actions-col">
+          <button type="button" onClick={() => setModalOpen(true)}>
+            + Add Winning
+          </button>
+          <div className="games-today-stats">
+            <span>
+              Won today: <strong>{todayStats.wonToday}</strong>
+            </span>
+            <span className="games-today-stats-sep">·</span>
+            <span>
+              Expected: <strong>{todayStats.expectedToday.toFixed(1)}</strong>
+              <span className="games-today-stats-hint"> ({todayStats.totalSims} SIMs ÷ 7)</span>
+            </span>
+          </div>
+        </div>
       }
     >
       <div className="card-stack">
@@ -306,7 +323,7 @@ export default function AdminGamesPage() {
               required
               disabled={!form.agentId}
             >
-              <option value="">Select session…</option>
+              <option value="">{sessions.length === 0 ? 'No available sessions' : 'Select session…'}</option>
               {sessions.map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}

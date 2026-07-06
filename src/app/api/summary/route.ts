@@ -88,6 +88,14 @@ export async function GET(req: NextRequest) {
   const games = await Game.find(await withGame(filter)).populate('agentId', 'name');
   const totals = sumGames(games);
 
+  if (type === 'today-progress') {
+    const today = new Date().toISOString().slice(0, 10);
+    const wonToday = await Game.countDocuments(await withGame({ date: today }));
+    const totalSims = await SimCard.countDocuments(await withGame());
+    const expectedToday = totalSims / 7;
+    return jsonOk({ today, wonToday, totalSims, expectedToday });
+  }
+
   if (type === 'sims') {
     const simFilter: Record<string, unknown> = {};
     if (session!.role === 'agent') simFilter.agentId = session!.agentId;

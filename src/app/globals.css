@@ -232,6 +232,46 @@ html { height: 100%; }
   flex-wrap: wrap;
 }
 
+.games-actions-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.games-today-stats {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.games-today-stats strong {
+  color: var(--heading);
+  font-weight: 600;
+}
+
+.games-today-stats-sep {
+  margin: 0 0.35rem;
+  opacity: 0.5;
+}
+
+.games-today-stats-hint {
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
+@media (max-width: 640px) {
+  .games-actions-col {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .games-today-stats {
+    white-space: normal;
+    text-align: right;
+  }
+}
+
 /* ── Cards ── */
 .card {
   background: var(--surface-glass);

@@ -4,7 +4,7 @@ import { getSession } from '@/lib/auth';
 import { calcNetProfit, calcExpectedToReceive, parseSessionId } from '@/lib/calculations';
 import { withGame, gameScope } from '@/lib/game-filter';
 import { jsonOk, jsonError, requireAdmin, serializeDoc } from '@/lib/api-utils';
-import { getAgentSessionIds } from '@/lib/sim-service';
+import { getAgentSessionIds, getAvailableSims } from '@/lib/sim-service';
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -51,12 +51,19 @@ export async function POST(req: NextRequest) {
   const sid = sessionId !== undefined ? parseSessionId(sessionId) : parseSessionId(gameName);
   if (!sid && sid !== 0) return jsonError('Session ID is required');
 
-  const validSessions = await getAgentSessionIds(agentId);
-  if (validSessions.length > 0 && !validSessions.includes(sid)) {
+  const { Game } = await getModels();
+  const availableSims = await getAvailableSims(agentId);
+  const availableIds = new Set(availableSims.map((s) => s.sessionId));
+  const activeGame = await Game.findOne(await withGame({ agentId, sessionId: sid, completed: 'pending' }));
+  if (!availableIds.has(sid) || activeGame) {
+    return jsonError('Session is not available yet (7-day cooldown or active game)');
+  }
+
+  const ownedSessions = await getAgentSessionIds(agentId);
+  if (ownedSessions.length > 0 && !ownedSessions.includes(sid)) {
     return jsonError('Session ID not found for this agent');
   }
 
-  const { Game } = await getModels();
   const won = Number(wonProfit) || 0;
   const net = calcNetProfit(won);
   const expected = expectedToReceive !== undefined ? Number(expectedToReceive) : calcExpectedToReceive(net);
