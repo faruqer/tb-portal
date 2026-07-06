@@ -48,7 +48,7 @@ export function LoginForm() {
             <h1 style={{ margin: 0 }}>Sign In</h1>
           </div>
           <p className="subtitle">
-            One login for admin and agents — switch between 35K and 20K Win after signing in
+            Admin and agents login.
           </p>
           <div className="field">
             <label className="label">Username</label>
