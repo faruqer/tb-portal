@@ -210,6 +210,7 @@ export default function ReportPage() {
     <AppShell
       links={adminLinks}
       userLabel="Admin"
+      stickyPageHeader
       title="Reports"
       subtitle="Financial summaries and game history"
       actions={

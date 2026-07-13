@@ -13,6 +13,7 @@ interface AppShellProps {
   subtitle?: string;
   actions?: ReactNode;
   showGameTabs?: boolean;
+  stickyPageHeader?: boolean;
   children: ReactNode;
 }
 
@@ -25,6 +26,7 @@ export function AppShell({
   subtitle,
   actions,
   showGameTabs = false,
+  stickyPageHeader = false,
   children,
 }: AppShellProps) {
   return (
@@ -37,7 +39,7 @@ export function AppShell({
       />
       <div className="page-content">
         {showGameTabs && <GameTabs />}
-        <div className="page-top">
+        <div className={`page-top${stickyPageHeader ? ' page-top-sticky' : ''}`}>
           <div>
             <h1>{title}</h1>
             {subtitle && <p>{subtitle}</p>}

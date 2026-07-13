@@ -260,7 +260,7 @@ export default function AdminGamesPage() {
   async function copySelected() {
     const lines = copyGames
       .filter((g) => selectedCopy.has(g.id))
-      .map((g) => `${g.sessionId ?? g.gameName},${g.netProfit}`);
+      .map((g) => `${g.sessionId ?? g.gameName} - ${g.netProfit}`);
     const text = lines.join('\n');
     await navigator.clipboard.writeText(text);
     setCopyMsg(`Copied ${lines.length} line(s)`);
