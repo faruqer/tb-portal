@@ -44,12 +44,11 @@ Two-role reward management system: **Admin** and **Agents**.
 | `/report` | General & specific summaries, full history, calendar |
 | `/agents` | Manage agents & SIM cards, map session IDs |
 | `/available` | Available SIM cards (auto-updated on winning) |
-| `/verify` | Approve/reject agent payment requests |
 
 ### Agent
 | Route | Description |
 |-------|-------------|
-| `/agent/games` | View winnings, mark as paid |
+| `/agent/games` | View winnings for current game tab |
 | `/agent/summary` | Personal summary |
 | `/agent/numbers` | SIM card list with sorting |
 
@@ -58,7 +57,9 @@ Two-role reward management system: **Admin** and **Agents**.
 - **Net profit** = won profit × 75%
 - **Expected to receive** = net profit × 50% (admin's half)
 - Adding a winning auto-marks matching SIM (by agent + session ID) as **in use**
-- Agent clicks **I Paid** → verification request → admin approves on `/verify`
+- Agents and SIM cards are shared across 35K and 20K; games are scoped by `gameType`
+- Admin marks games as **Paid** on the Games page (no agent verification flow)
+- Report page has a 35K / 20K selector to view each game's data separately
 
 ## SIM Sorting
 

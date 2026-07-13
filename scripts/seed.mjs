@@ -14,7 +14,7 @@ const GAME_TYPES = [
 ];
 
 const AgentSchema = new mongoose.Schema(
-  { gameType: String, name: String, username: String, passwordHash: String },
+  { name: String, username: String, passwordHash: String },
   { timestamps: true }
 );
 const GameSchema = new mongoose.Schema(
@@ -37,7 +37,6 @@ const GameSchema = new mongoose.Schema(
 );
 const SimCardSchema = new mongoose.Schema(
   {
-    gameType: String,
     agentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent' },
     phoneNumber: String,
     sessionId: Number,
@@ -45,22 +44,10 @@ const SimCardSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-const VerificationRequestSchema = new mongoose.Schema(
-  {
-    gameType: String,
-    gameId: { type: mongoose.Schema.Types.ObjectId, ref: 'Game' },
-    agentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent' },
-    status: String,
-    amount: Number,
-  },
-  { timestamps: true }
-);
 
 const Agent = mongoose.models.Agent || mongoose.model('Agent', AgentSchema);
 const Game = mongoose.models.Game || mongoose.model('Game', GameSchema);
 const SimCard = mongoose.models.SimCard || mongoose.model('SimCard', SimCardSchema);
-const VerificationRequest =
-  mongoose.models.VerificationRequest || mongoose.model('VerificationRequest', VerificationRequestSchema);
 
 function calcNet(won) {
   return Number((won * 0.75).toFixed(2));
@@ -163,12 +150,12 @@ const SIM_LAYOUT = {
   ],
 };
 
-/** Games: [sessionId, wonProfit, daysAgo, compite, idStatus, completed, paymentStatus, receivedOverride?] */
+/** Games: [sessionId, wonProfit, daysAgo, compite, idStatus, completed, paymentStatus] */
 function buildGamesForAgent(agentKey) {
   const templates = {
     m: [
       [2, 201, 0, 'completed', 'pending', 'pending', 'unpaid'],
-      [6, 201, 0, 'completed', 'sent', 'pending', 'pending_verify'],
+      [6, 201, 0, 'completed', 'sent', 'pending', 'unpaid'],
       [3, 185, 1, 'completed', 'pending', 'pending', 'paid'],
       [12, 201, 1, 'completed', 'pending', 'pending', 'unpaid'],
       [1, 150, 2, 'completed', 'sent', 'completed', 'paid'],
@@ -183,7 +170,7 @@ function buildGamesForAgent(agentKey) {
       [2, 160, 18, 'completed', 'sent', 'completed', 'paid'],
     ],
     abdi: [
-      [1, 201, 0, 'completed', 'pending', 'pending', 'pending_verify'],
+      [1, 201, 0, 'completed', 'pending', 'pending', 'unpaid'],
       [3, 201, 1, 'completed', 'sent', 'pending', 'unpaid'],
       [7, 201, 2, 'completed', 'pending', 'pending', 'unpaid'],
       [1, 180, 4, 'completed', 'sent', 'completed', 'paid'],
@@ -194,7 +181,7 @@ function buildGamesForAgent(agentKey) {
     ],
     aman: [
       [2, 201, 0, 'completed', 'pending', 'pending', 'unpaid'],
-      [3, 201, 0, 'completed', 'sent', 'pending', 'pending_verify'],
+      [3, 201, 0, 'completed', 'sent', 'pending', 'unpaid'],
       [9, 201, 2, 'completed', 'pending', 'pending', 'unpaid'],
       [2, 201, 5, 'completed', 'sent', 'completed', 'paid'],
       [3, 175, 8, 'completed', 'pending', 'completed', 'paid'],
@@ -204,7 +191,7 @@ function buildGamesForAgent(agentKey) {
     ],
     judin: [
       [1, 201, 0, 'completed', 'pending', 'pending', 'unpaid'],
-      [2, 201, 1, 'completed', 'sent', 'pending', 'pending_verify'],
+      [2, 201, 1, 'completed', 'sent', 'pending', 'unpaid'],
       [6, 201, 2, 'completed', 'pending', 'pending', 'unpaid'],
       [4, 201, 4, 'pending', 'pending', 'pending', 'unpaid'],
       [1, 201, 6, 'completed', 'sent', 'completed', 'paid'],
@@ -214,7 +201,7 @@ function buildGamesForAgent(agentKey) {
     ],
     anwar: [
       [1, 201, 0, 'completed', 'pending', 'pending', 'unpaid'],
-      [6, 201, 0, 'completed', 'sent', 'pending', 'pending_verify'],
+      [6, 201, 0, 'completed', 'sent', 'pending', 'unpaid'],
       [90, 201, 1, 'completed', 'pending', 'pending', 'unpaid'],
       [6, 201, 3, 'completed', 'sent', 'completed', 'paid'],
       [1, 175, 6, 'completed', 'pending', 'completed', 'paid'],
@@ -224,7 +211,7 @@ function buildGamesForAgent(agentKey) {
     ],
     hena: [
       [2, 201, 0, 'completed', 'pending', 'pending', 'unpaid'],
-      [7, 201, 2, 'completed', 'sent', 'pending', 'pending_verify'],
+      [7, 201, 2, 'completed', 'sent', 'pending', 'unpaid'],
       [2, 201, 5, 'completed', 'pending', 'completed', 'paid'],
       [7, 180, 9, 'completed', 'sent', 'completed', 'paid'],
       [1, 201, 14, 'completed', 'pending', 'completed', 'paid'],
@@ -232,7 +219,7 @@ function buildGamesForAgent(agentKey) {
     ],
     mark: [
       [1, 201, 0, 'completed', 'pending', 'pending', 'unpaid'],
-      [10, 201, 0, 'completed', 'sent', 'pending', 'pending_verify'],
+      [10, 201, 0, 'completed', 'sent', 'pending', 'unpaid'],
       [3, 201, 1, 'completed', 'pending', 'pending', 'unpaid'],
       [1, 201, 4, 'completed', 'sent', 'completed', 'paid'],
       [10, 195, 7, 'completed', 'pending', 'completed', 'paid'],
@@ -242,7 +229,7 @@ function buildGamesForAgent(agentKey) {
     ],
     yonas: [
       [2, 201, 1, 'completed', 'pending', 'pending', 'unpaid'],
-      [4, 201, 3, 'completed', 'sent', 'pending', 'pending_verify'],
+      [4, 201, 3, 'completed', 'sent', 'pending', 'unpaid'],
       [2, 201, 6, 'completed', 'pending', 'completed', 'paid'],
       [4, 185, 10, 'completed', 'sent', 'completed', 'paid'],
       [1, 201, 15, 'completed', 'pending', 'completed', 'paid'],
@@ -252,23 +239,28 @@ function buildGamesForAgent(agentKey) {
   return templates[agentKey] || [];
 }
 
-async function seedGameType({ key, label }) {
-  console.log(`\n=== Seeding ${label} (${key}) ===`);
-
-  console.log(`Clearing existing ${key} data…`);
+async function seedSharedAgentsAndSims() {
+  console.log('\n=== Seeding shared agents & SIM cards ===');
+  console.log('Clearing existing agents, SIMs, and games…');
   await Promise.all([
-    Agent.deleteMany({ gameType: key }),
-    Game.deleteMany({ gameType: key }),
-    SimCard.deleteMany({ gameType: key }),
-    VerificationRequest.deleteMany({ gameType: key }),
+    Agent.deleteMany({}),
+    Game.deleteMany({}),
+    SimCard.deleteMany({}),
   ]);
+
+  try {
+    await mongoose.connection.db.dropCollection('verificationrequests');
+    console.log('Dropped verificationrequests collection');
+  } catch {
+    /* collection may not exist */
+  }
 
   const passwordHash = await bcrypt.hash(AGENT_PASSWORD, 10);
   const agentDocs = {};
 
   console.log('Creating agents...');
   for (const a of AGENTS) {
-    const doc = await Agent.create({ name: a.name, username: a.username, passwordHash, gameType: key });
+    const doc = await Agent.create({ name: a.name, username: a.username, passwordHash });
     agentDocs[a.username] = doc;
   }
 
@@ -282,16 +274,19 @@ async function seedGameType({ key, label }) {
         phoneNumber: phone,
         sessionId,
         groupId: groupId || null,
-        gameType: key,
       });
       simCount++;
     }
   }
 
-  console.log('Creating games...');
-  let gameCount = 0;
-  const pendingVerifyGames = [];
+  return { agentDocs, simCount };
+}
 
+async function seedGamesForType({ key, label }, agentDocs) {
+  console.log(`\n=== Seeding ${label} games (${key}) ===`);
+  await Game.deleteMany({ gameType: key });
+
+  let gameCount = 0;
   for (const a of AGENTS) {
     const games = buildGamesForAgent(a.username);
     for (const [sessionId, won, days, compite, idStatus, completed, paymentStatus] of games) {
@@ -299,7 +294,7 @@ async function seedGameType({ key, label }) {
       const expected = calcExpected(net);
       const received = paymentStatus === 'paid' ? expected : 0;
 
-      const game = await Game.create({
+      await Game.create({
         gameName: String(sessionId),
         sessionId,
         agentId: agentDocs[a.username]._id,
@@ -316,73 +311,31 @@ async function seedGameType({ key, label }) {
         createdAt: daysAgoDate(days),
       });
       gameCount++;
-
-      if (paymentStatus === 'pending_verify') {
-        pendingVerifyGames.push({ game, agentId: agentDocs[a.username]._id });
-      }
     }
-  }
-
-  console.log('Creating verification requests...');
-  let verifyCount = 0;
-  for (const { game, agentId } of pendingVerifyGames) {
-    const submitted = game.expectedToReceive + (Math.random() > 0.5 ? 0 : -5);
-    await VerificationRequest.create({
-      gameId: game._id,
-      agentId,
-      status: 'pending',
-      amount: Number(submitted.toFixed(2)),
-      gameType: key,
-      createdAt: new Date(),
-    });
-    verifyCount++;
-  }
-
-  const paidGames = await Game.find({ paymentStatus: 'paid', gameType: key }).limit(6);
-  for (let i = 0; i < paidGames.length; i++) {
-    await VerificationRequest.create({
-      gameId: paidGames[i]._id,
-      agentId: paidGames[i].agentId,
-      status: 'approved',
-      amount: paidGames[i].expectedToReceive,
-      gameType: key,
-      createdAt: daysAgoDate(i + 3),
-    });
-    verifyCount++;
-  }
-
-  const unpaidGames = await Game.find({ paymentStatus: 'unpaid', gameType: key }).limit(2);
-  for (const g of unpaidGames) {
-    await VerificationRequest.create({
-      gameId: g._id,
-      agentId: g.agentId,
-      status: 'rejected',
-      amount: g.expectedToReceive,
-      gameType: key,
-      createdAt: daysAgoDate(5),
-    });
-    verifyCount++;
   }
 
   const todayGames = await Game.countDocuments({ date: daysAgo(0), gameType: key });
   const activeGames = await Game.countDocuments({ completed: 'pending', gameType: key });
+  const paidGames = await Game.countDocuments({ paymentStatus: 'paid', gameType: key });
 
-  console.log(`--- ${label} seed complete ---`);
-  console.log(`Agents:     ${AGENTS.length} (password: ${AGENT_PASSWORD})`);
-  console.log(`SIM cards:  ${simCount}`);
-  console.log(`Games:      ${gameCount} (${todayGames} today, ${activeGames} active)`);
-  console.log(`Verify:     ${verifyCount} (${pendingVerifyGames.length} pending)`);
+  console.log(`--- ${label} games complete ---`);
+  console.log(`Games:      ${gameCount} (${todayGames} today, ${activeGames} active, ${paidGames} paid)`);
 }
 
 async function main() {
   console.log('Connecting to MongoDB...');
   await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/reward-manager');
 
+  const { agentDocs, simCount } = await seedSharedAgentsAndSims();
+
   for (const game of GAME_TYPES) {
-    await seedGameType(game);
+    await seedGamesForType(game, agentDocs);
   }
 
-  console.log('\nLogin as admin: admin / admin1001');
+  console.log('\n=== Seed complete ===');
+  console.log(`Agents:     ${AGENTS.length} (password: ${AGENT_PASSWORD})`);
+  console.log(`SIM cards:  ${simCount} (shared across 35K & 20K)`);
+  console.log('Login as admin: admin / admin1001');
   console.log('Login as agent: m / agent123 (or any agent username)');
 
   await mongoose.disconnect();

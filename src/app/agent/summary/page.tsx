@@ -3,15 +3,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { agentLinks } from '@/components/NavBar';
+import { ReportGameFilter } from '@/components/ReportGameFilter';
 import { SummaryGrid } from '@/components/SummaryGrid';
 import { useSession, apiFetch } from '@/lib/hooks';
 import { money } from '@/lib/calculations';
+import { gameBadgeClass, gameRowClass, gameTypeLabel } from '@/lib/game-styles';
+import type { GameFilter } from '@/lib/game-filter';
 import type { GameTotals } from '@/lib/types';
 
 interface HistoryGame {
   id: string;
   gameName: string;
   date: string;
+  gameType?: string;
   wonProfit: number;
   netProfit: number;
   expectedToReceive: number;
@@ -23,16 +27,22 @@ export default function AgentSummaryPage() {
   const [totals, setTotals] = useState<GameTotals>({ wonProfit: 0, netProfit: 0, expectedToReceive: 0, received: 0, count: 0 });
   const [history, setHistory] = useState<HistoryGame[]>([]);
   const [filterDate, setFilterDate] = useState('');
+  const [reportGame, setReportGame] = useState<GameFilter>('all');
+
+  const gq = useCallback((path: string) => {
+    const sep = path.includes('?') ? '&' : '?';
+    return `${path}${sep}game=${reportGame}`;
+  }, [reportGame]);
 
   const load = useCallback(async () => {
-    const summaryUrl = filterDate ? `/api/summary?date=${filterDate}` : '/api/summary';
-    const [summaryData, paidGames] = await Promise.all([
-      apiFetch<{ totals: GameTotals }>(summaryUrl),
-      apiFetch<HistoryGame[]>('/api/games?completed=true'),
+    const datePart = filterDate ? `&date=${filterDate}` : '';
+    const [summaryData, historyGames] = await Promise.all([
+      apiFetch<{ totals: GameTotals }>(gq(`/api/summary?type=general${datePart}`)),
+      apiFetch<HistoryGame[]>('/api/games?completed=true&game=all'),
     ]);
     setTotals(summaryData.totals);
-    setHistory(paidGames);
-  }, [filterDate]);
+    setHistory(historyGames);
+  }, [filterDate, gq]);
 
   useEffect(() => { if (!loading) load().catch(console.error); }, [loading, load]);
 
@@ -47,10 +57,11 @@ export default function AgentSummaryPage() {
       title="Summary"
       subtitle="Your earnings overview and payment history"
       actions={
-        <>
+        <div className="page-actions-row">
+          <ReportGameFilter value={reportGame} onChange={setReportGame} />
           <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} style={{ width: 'auto' }} />
           {filterDate && <button type="button" className="btn-secondary btn-sm" onClick={() => setFilterDate('')}>Clear</button>}
-        </>
+        </div>
       }
     >
       <div className="card-stack">
@@ -70,14 +81,15 @@ export default function AgentSummaryPage() {
 
         <div className="card">
           <div className="card-header">
-            <h3>Payment History</h3>
-            <span className="badge badge-muted">{history.length} paid</span>
+            <h3>Game History</h3>
+            <span className="badge badge-muted">{history.length} completed</span>
           </div>
           <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
                   <th>Session</th>
+                  <th>Game</th>
                   <th>Date</th>
                   <th>Won</th>
                   <th>Net</th>
@@ -87,11 +99,12 @@ export default function AgentSummaryPage() {
               </thead>
               <tbody>
                 {history.length === 0 ? (
-                  <tr><td colSpan={6} className="empty-state">No paid games yet</td></tr>
+                  <tr><td colSpan={7} className="empty-state">No completed games yet</td></tr>
                 ) : (
                   history.map((g) => (
-                    <tr key={g.id}>
+                    <tr key={g.id} className={gameRowClass(g.gameType)}>
                       <td><strong>{g.gameName}</strong></td>
+                      <td><span className={`badge ${gameBadgeClass(g.gameType)}`}>{gameTypeLabel(g.gameType)}</span></td>
                       <td>{g.date}</td>
                       <td>{money(g.wonProfit)}</td>
                       <td>{money(g.netProfit)}</td>

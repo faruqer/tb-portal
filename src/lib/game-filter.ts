@@ -1,16 +1,28 @@
 import { getGameKey } from '@/lib/game-context';
-import type { GameKey } from '@/lib/games';
+import { isGameKey, type GameKey } from '@/lib/games';
+
+export type GameFilter = GameKey | 'all';
 
 export async function currentGameType(): Promise<GameKey> {
   return getGameKey();
 }
 
-/** Merge active game tab into a MongoDB filter */
-export async function withGame(filter: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
-  return { ...filter, gameType: await getGameKey() };
+export function gameFromParam(value: string | null | undefined): GameFilter | undefined {
+  if (value === 'all') return 'all';
+  return isGameKey(value) ? value : undefined;
 }
 
-/** Fields to set when creating documents */
-export async function gameScope(): Promise<{ gameType: GameKey }> {
-  return { gameType: await getGameKey() };
+/** Merge game type into a MongoDB filter (games only). Pass `all` to include every game type. */
+export async function withGame(
+  filter: Record<string, unknown> = {},
+  override?: GameFilter
+): Promise<Record<string, unknown>> {
+  if (override === 'all') return filter;
+  const gameType = override ?? (await getGameKey());
+  return { ...filter, gameType };
+}
+
+/** Fields to set when creating game documents */
+export async function gameScope(override?: GameKey): Promise<{ gameType: GameKey }> {
+  return { gameType: override ?? (await getGameKey()) };
 }

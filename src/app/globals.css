@@ -289,6 +289,174 @@ html { height: 100%; }
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 
+.card-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  font-size: 1rem;
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  box-shadow: none;
+  transform: none;
+}
+
+.icon-btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--border-strong);
+  box-shadow: none;
+  transform: none;
+}
+
+.row-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.copy-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.copy-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.copy-check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.copy-check-item input {
+  margin-top: 0.2rem;
+  width: auto;
+}
+
+.copy-meta {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.copy-success {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  color: var(--success);
+}
+
+/* Game type colors (35K green, 20K yellow) */
+.data-table tr.row-game-35k {
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.data-table tr.row-game-35k:hover {
+  background: rgba(34, 197, 94, 0.22);
+}
+
+.data-table tr.row-game-20k {
+  background: rgba(234, 179, 8, 0.16);
+}
+
+.data-table tr.row-game-20k:hover {
+  background: rgba(234, 179, 8, 0.24);
+}
+
+.badge-game-35k {
+  background: rgba(34, 197, 94, 0.2);
+  color: #15803d;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.badge-game-20k {
+  background: rgba(234, 179, 8, 0.22);
+  color: #a16207;
+  border: 1px solid rgba(234, 179, 8, 0.4);
+}
+
+.game-legend {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.game-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.game-legend-swatch {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+
+.game-legend-35k {
+  background: rgba(34, 197, 94, 0.45);
+}
+
+.game-legend-20k {
+  background: rgba(234, 179, 8, 0.5);
+}
+
+.report-game-filter {
+  margin: 0;
+  min-width: 10rem;
+}
+
+.report-game-filter .label {
+  margin-bottom: 0.25rem;
+  font-size: 0.72rem;
+}
+
+.page-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+}
+
+.page-actions-row .tab-bar {
+  margin: 0;
+}
+
+.next-play-cell {
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.next-play-35k {
+  color: #15803d;
+}
+
+.next-play-20k {
+  color: #a16207;
+}
+
 .card-header {
   display: flex;
   align-items: center;

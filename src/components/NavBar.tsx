@@ -62,7 +62,6 @@ export const adminLinks: NavLink[] = [
   { href: '/report', label: 'Report' },
   { href: '/agents', label: 'Agents' },
   { href: '/available', label: 'Available' },
-  { href: '/verify', label: 'Verify' },
 ];
 
 export const agentLinks: NavLink[] = [

@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server';
 import { getModels } from '@/lib/mongodb';
 import { getSession } from '@/lib/auth';
-import { calcNetProfit, calcExpectedToReceive } from '@/lib/calculations';
-import { withGame, gameScope } from '@/lib/game-filter';
+import { calcNetProfit, calcExpectedToReceive, roundAmount } from '@/lib/calculations';
 import { jsonOk, jsonError, requireAdmin, serializeDoc } from '@/lib/api-utils';
+import { refreshSimLastPlayed } from '@/lib/sim-service';
+import type { GameKey } from '@/lib/games';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -13,42 +14,36 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const body = await req.json();
-  const { Game, VerificationRequest } = await getModels();
+  const { Game } = await getModels();
 
-  const game = await Game.findOne(await withGame({ _id: id }));
+  const game = await Game.findById(id);
   if (!game) return jsonError('Game not found', 404);
 
   if (session.role === 'agent') {
     if (game.agentId.toString() !== session.agentId) {
       return jsonError('Forbidden', 403);
     }
-    if (body.action === 'mark_paid') {
-      const amount = Number(body.amount);
-      if (!Number.isFinite(amount) || amount <= 0) {
-        return jsonError('Please enter the amount you sent');
-      }
-      if (game.paymentStatus === 'paid') {
-        return jsonError('Already marked as paid');
-      }
-      game.paymentStatus = 'pending_verify';
-      await game.save();
+    return jsonError('Agents cannot edit games');
+  }
 
-      const existing = await VerificationRequest.findOne(await withGame({ gameId: id, status: 'pending' }));
-      if (existing) {
-        existing.amount = amount;
-        await existing.save();
-      } else {
-        await VerificationRequest.create({
-          gameId: id,
-          agentId: game.agentId,
-          amount,
-          status: 'pending',
-          ...(await gameScope()),
-        });
-      }
-      return jsonOk(serializeDoc(game.toObject()));
-    }
-    return jsonError('Agents can only mark games as paid');
+  if (body.action === 'mark_paid') {
+    game.paymentStatus = 'paid';
+    game.received = roundAmount(Number(body.received ?? game.expectedToReceive));
+    game.completed = 'completed';
+    game.compite = 'completed';
+    game.idStatus = 'sent';
+    await game.save();
+    return jsonOk(serializeDoc(game.toObject()));
+  }
+
+  if (body.action === 'mark_unpaid') {
+    game.paymentStatus = 'unpaid';
+    game.received = 0;
+    game.completed = 'pending';
+    game.compite = 'pending';
+    game.idStatus = 'pending';
+    await game.save();
+    return jsonOk(serializeDoc(game.toObject()));
   }
 
   const won = body.wonProfit !== undefined ? Number(body.wonProfit) : game.wonProfit;
@@ -79,10 +74,15 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (denied) return denied;
 
   const { id } = await params;
-  const { Game, VerificationRequest } = await getModels();
-  await Promise.all([
-    Game.findOneAndDelete(await withGame({ _id: id })),
-    VerificationRequest.deleteMany(await withGame({ gameId: id })),
-  ]);
+  const { Game } = await getModels();
+  const game = await Game.findById(id);
+  if (!game) return jsonError('Game not found', 404);
+
+  const agentId = game.agentId.toString();
+  const sessionId = game.sessionId;
+  const gameType = game.gameType as GameKey;
+
+  await Game.findByIdAndDelete(id);
+  await refreshSimLastPlayed(agentId, sessionId, gameType);
   return jsonOk({ ok: true });
 }

@@ -17,7 +17,7 @@ export const GameSchema = new Schema(
     completed: { type: String, enum: ['pending', 'completed'], default: 'pending' },
     paymentStatus: {
       type: String,
-      enum: ['unpaid', 'pending_verify', 'paid'],
+      enum: ['unpaid', 'paid'],
       default: 'unpaid',
     },
   },

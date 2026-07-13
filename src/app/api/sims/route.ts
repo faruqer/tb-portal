@@ -2,24 +2,40 @@ import { NextRequest } from 'next/server';
 import { getModels } from '@/lib/mongodb';
 import { getSession } from '@/lib/auth';
 import { parseSessionId, normalizeGroupId } from '@/lib/calculations';
-import { withGame, gameScope } from '@/lib/game-filter';
+import { currentGameType } from '@/lib/game-filter';
 import { jsonOk, jsonError, requireAdmin, serializeDoc } from '@/lib/api-utils';
-import { buildPlayDateMap, enrichSimWithDates, getAvailableSims, getNextSessionId } from '@/lib/sim-service';
+import { enrichSimWithDates, enrichSimBothGames, getAvailableSims, getNextSessionId } from '@/lib/sim-service';
 
 function mapSimResponse(
   obj: Record<string, unknown>,
   agentId: string,
-  playMap: Map<string, Date>
+  gameType: Awaited<ReturnType<typeof currentGameType>>
 ) {
   const agent = obj.agentId as { _id?: { toString(): string }; name?: string };
   const aid = agent?._id?.toString?.() ?? agentId;
-  const dates = enrichSimWithDates(aid, obj as never, playMap);
+  const dates = enrichSimWithDates(obj as never, gameType);
   return {
     ...serializeDoc(obj as never),
     agentId: aid,
     agentName: agent?.name,
     groupId: obj.groupId ?? null,
     ...dates,
+  };
+}
+
+function mapSimResponseBoth(obj: Record<string, unknown>, agentId: string) {
+  const agent = obj.agentId as { _id?: { toString(): string }; name?: string };
+  const aid = agent?._id?.toString?.() ?? agentId;
+  const both = enrichSimBothGames(obj as never);
+  return {
+    ...serializeDoc(obj as never),
+    agentId: aid,
+    agentName: agent?.name,
+    groupId: obj.groupId ?? null,
+    next35kAt: both['35k'].nextPlayingAt,
+    next35kReady: both['35k'].isAvailable,
+    next20kAt: both['20k'].nextPlayingAt,
+    next20kReady: both['20k'].isAvailable,
   };
 }
 
@@ -30,17 +46,18 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const availableOnly = searchParams.get('available') === 'true';
   const agentId = searchParams.get('agentId');
+  const bothGames = searchParams.get('both') === 'true';
+  const gameType = await currentGameType();
 
   if (availableOnly) {
     const filterAgentId = session.role === 'agent' ? session.agentId : agentId || undefined;
-    const sims = await getAvailableSims(filterAgentId);
-    const playMap = await buildPlayDateMap(filterAgentId);
+    const sims = await getAvailableSims(filterAgentId, gameType);
     return jsonOk(
       sims.map((s) => {
         const obj = s.toObject();
         const agent = obj.agentId as { _id?: { toString(): string }; name?: string };
         const aid = agent?._id?.toString?.() ?? obj.agentId?.toString?.();
-        return mapSimResponse(obj as never, aid, playMap);
+        return mapSimResponse(obj as never, aid, gameType);
       })
     );
   }
@@ -53,17 +70,15 @@ export async function GET(req: NextRequest) {
     filter.agentId = agentId;
   }
 
-  const [sims, playMap] = await Promise.all([
-    SimCard.find(await withGame(filter)).populate('agentId', 'name').sort({ sessionId: 1 }),
-    buildPlayDateMap(agentId || (session.role === 'agent' ? session.agentId : undefined)),
-  ]);
+  const sims = await SimCard.find(filter).populate('agentId', 'name').sort({ sessionId: 1 });
 
   return jsonOk(
     sims.map((s) => {
       const obj = s.toObject();
       const agent = obj.agentId as { _id?: { toString(): string }; name?: string };
       const aid = agent?._id?.toString?.() ?? obj.agentId?.toString?.();
-      return mapSimResponse(obj as never, aid, playMap);
+      if (bothGames) return mapSimResponseBoth(obj as never, aid);
+      return mapSimResponse(obj as never, aid, gameType);
     })
   );
 }
@@ -91,7 +106,6 @@ export async function POST(req: NextRequest) {
     phoneNumber: String(phoneNumber).trim(),
     sessionId: sid,
     groupId: normalizeGroupId(groupId),
-    ...(await gameScope()),
   });
 
   return jsonOk(serializeDoc(sim.toObject()), 201);

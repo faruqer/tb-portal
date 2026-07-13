@@ -97,6 +97,7 @@ export default function AvailablePage() {
       <AppShell
         links={adminLinks}
         userLabel="Admin"
+        showGameTabs
         title="Available SIMs"
         subtitle="Cards ready to play — updated automatically when winnings are added"
         actions={

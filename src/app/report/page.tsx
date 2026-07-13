@@ -6,8 +6,11 @@ import { adminLinks } from '@/components/NavBar';
 import { SummaryGrid } from '@/components/SummaryGrid';
 import { DayMetrics } from '@/components/DayMetrics';
 import { ReportChart, type ChartData, type MetricKey } from '@/components/ReportChart';
+import { ReportGameFilter } from '@/components/ReportGameFilter';
 import { useSession, apiFetch } from '@/lib/hooks';
 import { money } from '@/lib/calculations';
+import { gameBadgeClass, gameRowClass, gameTypeLabel } from '@/lib/game-styles';
+import type { GameFilter } from '@/lib/game-filter';
 import type { GameTotals } from '@/lib/types';
 
 interface Agent { id: string; name: string; }
@@ -15,7 +18,7 @@ interface Agent { id: string; name: string; }
 interface Game {
   id: string; gameName: string; agentId: string; agentName?: string;
   wonProfit: number; netProfit: number; expectedToReceive: number; received: number;
-  date: string; paymentStatus: string;
+  date: string; paymentStatus: string; gameType?: string;
 }
 
 interface AgentSummary { agentId: string; agentName: string; totals: GameTotals; }
@@ -34,7 +37,9 @@ type View = typeof VIEWS[number];
 export default function ReportPage() {
   const { loading } = useSession('admin');
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [games, setGames] = useState<Game[]>([]);
+  const [historyGames, setHistoryGames] = useState<Game[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [unpayingId, setUnpayingId] = useState<string | null>(null);
   const [filterAgent, setFilterAgent] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [view, setView] = useState<View>('general');
@@ -46,56 +51,104 @@ export default function ReportPage() {
   const [chartPeriod, setChartPeriod] = useState<'day' | 'week' | 'month'>('week');
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [chartMetrics, setChartMetrics] = useState<Set<MetricKey>>(new Set(['won', 'net', 'expected', 'received']));
+  const [reportGame, setReportGame] = useState<GameFilter>('all');
+
+  const gq = useCallback((path: string) => {
+    const sep = path.includes('?') ? '&' : '?';
+    return `${path}${sep}game=${reportGame}`;
+  }, [reportGame]);
 
   const load = useCallback(async () => {
-    const [agentsData, gamesData, byAgent] = await Promise.all([
+    const [agentsData, byAgent] = await Promise.all([
       apiFetch<Agent[]>('/api/agents'),
-      apiFetch<Game[]>('/api/games'),
-      apiFetch<AgentSummary[]>('/api/summary?type=by-agent'),
+      apiFetch<AgentSummary[]>(gq('/api/summary?type=by-agent')),
     ]);
     setAgents(agentsData);
-    setGames(gamesData);
     setAgentSummaries(byAgent);
-  }, []);
+  }, [gq]);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const gameParam = reportGame === 'all' ? 'all' : reportGame;
+      const data = await apiFetch<Game[]>(`/api/games?paymentStatus=paid&game=${gameParam}`);
+      setHistoryGames(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [reportGame]);
 
   useEffect(() => { if (!loading) load().catch(console.error); }, [loading, load]);
 
   useEffect(() => {
+    if (view === 'history' && !loading) {
+      loadHistory().catch(console.error);
+    }
+  }, [view, loading, loadHistory]);
+
+  useEffect(() => {
     if (view === 'calendar' && !loading) {
-      apiFetch<{ byDay: Record<string, GameTotals>; totals: GameTotals }>(`/api/summary?type=monthly&month=${month}`)
+      apiFetch<{ byDay: Record<string, GameTotals>; totals: GameTotals }>(gq(`/api/summary?type=monthly&month=${month}`))
         .then(setMonthData).catch(console.error);
     }
-  }, [view, month, loading]);
+  }, [view, month, loading, gq]);
 
   useEffect(() => {
     if (view === 'weekly' && !loading) {
       apiFetch<{ byDay: Record<string, GameTotals>; totals: GameTotals; weekStart: string; weekEnd: string }>(
-        `/api/summary?type=weekly&weekStart=${weekStart}`
+        gq(`/api/summary?type=weekly&weekStart=${weekStart}`)
       ).then(setWeekData).catch(console.error);
     }
-  }, [view, weekStart, loading]);
+  }, [view, weekStart, loading, gq]);
 
   useEffect(() => {
     if (view === 'chart' && !loading) {
-      apiFetch<ChartData>(`/api/summary?type=chart&period=${chartPeriod}`)
+      apiFetch<ChartData>(gq(`/api/summary?type=chart&period=${chartPeriod}`))
         .then(setChartData).catch(console.error);
     }
-  }, [view, chartPeriod, loading]);
+  }, [view, chartPeriod, loading, gq]);
 
-  const filteredGames = useMemo(() => games.filter((g) => {
+  const filteredHistory = useMemo(() => historyGames.filter((g) => {
     if (filterAgent && g.agentId !== filterAgent) return false;
     if (filterDate && g.date !== filterDate) return false;
     return true;
-  }), [games, filterAgent, filterDate]);
+  }), [historyGames, filterAgent, filterDate]);
 
-  const totals = useMemo(() => filteredGames.reduce(
-    (acc, g) => ({
-      wonProfit: acc.wonProfit + g.wonProfit, netProfit: acc.netProfit + g.netProfit,
-      expectedToReceive: acc.expectedToReceive + g.expectedToReceive,
-      received: acc.received + g.received, count: acc.count + 1,
-    }),
-    { wonProfit: 0, netProfit: 0, expectedToReceive: 0, received: 0, count: 0 } as GameTotals
-  ), [filteredGames]);
+  const totals = useMemo(() => {
+    if (view === 'general') {
+      return agentSummaries.reduce(
+        (acc, a) => ({
+          wonProfit: acc.wonProfit + a.totals.wonProfit,
+          netProfit: acc.netProfit + a.totals.netProfit,
+          expectedToReceive: acc.expectedToReceive + a.totals.expectedToReceive,
+          received: acc.received + a.totals.received,
+          count: acc.count + a.totals.count,
+        }),
+        { wonProfit: 0, netProfit: 0, expectedToReceive: 0, received: 0, count: 0 } as GameTotals
+      );
+    }
+    return { wonProfit: 0, netProfit: 0, expectedToReceive: 0, received: 0, count: 0 };
+  }, [view, agentSummaries]);
+
+  async function markUnpaid(id: string) {
+    if (unpayingId) return;
+    setUnpayingId(id);
+    try {
+      await apiFetch(`/api/games/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'mark_unpaid' }),
+      });
+      setHistoryGames((prev) => prev.filter((g) => g.id !== id));
+    } catch (err) {
+      console.error(err);
+      await loadHistory();
+    } finally {
+      setUnpayingId(null);
+    }
+  }
 
   function toggleMetric(key: MetricKey) {
     setChartMetrics((prev) => {
@@ -160,12 +213,15 @@ export default function ReportPage() {
       title="Reports"
       subtitle="Financial summaries and game history"
       actions={
-        <div className="tab-bar tab-bar-scroll">
-          {VIEWS.map((v) => (
-            <button key={v} type="button" className={view === v ? 'active' : ''} onClick={() => setView(v)}>
-              {v.charAt(0).toUpperCase() + v.slice(1)}
-            </button>
-          ))}
+        <div className="page-actions-row">
+          <ReportGameFilter value={reportGame} onChange={setReportGame} />
+          <div className="tab-bar tab-bar-scroll">
+            {VIEWS.map((v) => (
+              <button key={v} type="button" className={view === v ? 'active' : ''} onClick={() => setView(v)}>
+                {v.charAt(0).toUpperCase() + v.slice(1)}
+              </button>
+            ))}
+          </div>
         </div>
       }
     >
@@ -253,24 +309,44 @@ export default function ReportPage() {
               </div>
             </div>
           </div>
-          <div className="card"><SummaryGrid totals={totals} label={`${filteredGames.length} games`} /></div>
           <div className="card">
+            <div className="card-header">
+              <h3>Paid history</h3>
+              <span className="badge badge-muted">{filteredHistory.length} paid</span>
+            </div>
             <div className="table-wrap">
               <table className="data-table">
-                <thead><tr><th>Date</th><th>Agent</th><th>Session</th><th>Won</th><th>Net</th><th>Expected</th><th>Received</th><th>Payment</th></tr></thead>
+                <thead><tr><th>Date</th><th>Game</th><th>Agent</th><th>Session</th><th>Won</th><th>Net</th><th>Expected</th><th>Received</th><th></th></tr></thead>
                 <tbody>
-                  {filteredGames.map((g) => (
-                    <tr key={g.id}>
-                      <td>{g.date}</td>
-                      <td>{g.agentName || g.agentId}</td>
-                      <td>{g.gameName}</td>
-                      <td>{money(g.wonProfit)}</td>
-                      <td>{money(g.netProfit)}</td>
-                      <td>{money(g.expectedToReceive)}</td>
-                      <td>{g.received > 0 ? money(g.received) : '—'}</td>
-                      <td><span className={`badge badge-${g.paymentStatus === 'paid' ? 'success' : g.paymentStatus === 'pending_verify' ? 'warning' : 'muted'}`}>{g.paymentStatus === 'pending_verify' ? 'verify payment' : g.paymentStatus}</span></td>
-                    </tr>
-                  ))}
+                  {historyLoading ? (
+                    <tr><td colSpan={9} className="empty-state">Loading…</td></tr>
+                  ) : filteredHistory.length === 0 ? (
+                    <tr><td colSpan={9} className="empty-state">No paid games found</td></tr>
+                  ) : (
+                    filteredHistory.map((g) => (
+                      <tr key={g.id} className={gameRowClass(g.gameType)}>
+                        <td>{g.date}</td>
+                        <td><span className={`badge ${gameBadgeClass(g.gameType)}`}>{gameTypeLabel(g.gameType)}</span></td>
+                        <td>{g.agentName || g.agentId}</td>
+                        <td>{g.gameName}</td>
+                        <td>{money(g.wonProfit)}</td>
+                        <td>{money(g.netProfit)}</td>
+                        <td>{money(g.expectedToReceive)}</td>
+                        <td>{g.received > 0 ? money(g.received) : '—'}</td>
+                        <td className="row-actions">
+                          <button
+                            type="button"
+                            className="btn-secondary btn-sm"
+                            disabled={unpayingId === g.id}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => markUnpaid(g.id)}
+                          >
+                            {unpayingId === g.id ? '…' : 'Unpaid'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

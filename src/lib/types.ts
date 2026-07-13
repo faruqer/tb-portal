@@ -2,8 +2,7 @@ export type Role = 'admin' | 'agent';
 
 export type GameStatus = 'pending' | 'completed';
 export type IdStatus = 'pending' | 'sent';
-export type PaymentStatus = 'unpaid' | 'pending_verify' | 'paid';
-export type VerifyStatus = 'pending' | 'approved' | 'rejected';
+export type PaymentStatus = 'unpaid' | 'paid';
 export type SimSortMode = 'ascending' | 'grouped' | 'by-agent' | 'by-agent-group';
 
 export interface SessionPayload {

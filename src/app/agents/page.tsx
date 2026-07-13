@@ -7,6 +7,7 @@ import { Modal } from '@/components/Modal';
 import { PhoneReveal } from '@/components/PhoneReveal';
 import { PhoneRevealProvider, ShowAllNumbersButton } from '@/components/PhoneRevealContext';
 import { useSession, apiFetch } from '@/lib/hooks';
+import { formatDateTime } from '@/lib/calculations';
 import { sortSims, groupColorClass } from '@/lib/sort-sims';
 import type { SimSortMode } from '@/lib/types';
 
@@ -22,11 +23,14 @@ interface Sim {
   phoneNumber: string;
   sessionId: number;
   groupId: string | null;
-  lastPlayedDate: string | null;
-  lastPlayedAt: string | null;
-  nextPlayingDate: string | null;
-  nextPlayingAt: string | null;
-  isAvailable: boolean;
+  next35kAt: string | null;
+  next35kReady: boolean;
+  next20kAt: string | null;
+  next20kReady: boolean;
+}
+
+function nextPlayLabel(ready: boolean, at: string | null): string {
+  return ready ? 'Ready' : formatDateTime(at);
 }
 
 export default function AgentsPage() {
@@ -67,7 +71,7 @@ export default function AgentsPage() {
   const load = useCallback(async () => {
     const [agentsData, simsData] = await Promise.all([
       apiFetch<Agent[]>('/api/agents'),
-      apiFetch<Sim[]>('/api/sims'),
+      apiFetch<Sim[]>('/api/sims?both=true'),
     ]);
     setAgents(agentsData);
     setSims(simsData);
@@ -137,14 +141,6 @@ export default function AgentsPage() {
     await load();
   }
 
-  function toLocalDatetime(iso: string | null): string {
-    if (!iso) return '';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '';
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  }
-
   async function deleteSim(id: string) {
     if (!confirm('Delete this SIM card?')) return;
     await apiFetch(`/api/sims/${id}`, { method: 'DELETE' });
@@ -209,8 +205,8 @@ export default function AgentsPage() {
                   <th>Session</th>
                   <th>Phone</th>
                   <th>Group</th>
-                  <th>Last Played</th>
-                  <th>Next Play</th>
+                  <th>Next 35K</th>
+                  <th>Next 20K</th>
                   <th></th>
                 </tr>
               </thead>
@@ -256,33 +252,11 @@ export default function AgentsPage() {
                         </datalist>
                         {s.groupId && <span className="badge-group">{s.groupId}</span>}
                       </td>
-                      <td>
-                        <input
-                          key={`last-${s.id}-${s.lastPlayedAt}`}
-                          type="datetime-local"
-                          className="inline-input datetime-input"
-                          defaultValue={toLocalDatetime(s.lastPlayedAt)}
-                          onBlur={(e) => {
-                            const iso = e.target.value ? new Date(e.target.value).toISOString() : null;
-                            if (iso !== (s.lastPlayedAt ?? null)) {
-                              updateSim(s.id, { lastPlayedAt: iso });
-                            }
-                          }}
-                        />
+                      <td className="next-play-cell next-play-35k">
+                        {nextPlayLabel(s.next35kReady, s.next35kAt)}
                       </td>
-                      <td>
-                        <input
-                          key={`next-${s.id}-${s.nextPlayingAt}`}
-                          type="datetime-local"
-                          className="inline-input datetime-input"
-                          defaultValue={toLocalDatetime(s.nextPlayingAt)}
-                          onBlur={(e) => {
-                            const iso = e.target.value ? new Date(e.target.value).toISOString() : null;
-                            if (iso !== (s.nextPlayingAt ?? null)) {
-                              updateSim(s.id, { nextPlayingAt: iso });
-                            }
-                          }}
-                        />
+                      <td className="next-play-cell next-play-20k">
+                        {nextPlayLabel(s.next20kReady, s.next20kAt)}
                       </td>
                       <td>
                         <button type="button" className="btn-danger btn-sm" onClick={() => deleteSim(s.id)}>×</button>

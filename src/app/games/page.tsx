@@ -48,10 +48,14 @@ function GameRow({
   game,
   onUpdate,
   onDelete,
+  onMarkPaid,
+  markingPaid,
 }: {
   game: Game;
   onUpdate: (id: string, updates: Record<string, unknown>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onMarkPaid: (id: string) => Promise<void>;
+  markingPaid: boolean;
 }) {
   const skipBlur = useRef(false);
   const [won, setWon] = useState(amountInput(game.wonProfit));
@@ -89,8 +93,8 @@ function GameRow({
     <tr>
       <td>
         <strong>{game.gameName}</strong>
-        {game.paymentStatus === 'pending_verify' && (
-          <span className="badge badge-warning" style={{ marginLeft: '0.4rem' }}>verify payment</span>
+        {game.paymentStatus === 'paid' && (
+          <span className="badge badge-success" style={{ marginLeft: '0.4rem' }}>paid</span>
         )}
       </td>
       <td>
@@ -124,7 +128,18 @@ function GameRow({
           onBlur={() => blurCommit(commitExpected, skipBlur)}
         />
       </td>
-      <td>
+      <td className="row-actions">
+        {game.paymentStatus !== 'paid' && (
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            disabled={markingPaid}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onMarkPaid(game.id)}
+          >
+            {markingPaid ? '…' : 'Paid'}
+          </button>
+        )}
         <button type="button" className="btn-danger btn-sm" onClick={() => onDelete(game.id)}>Delete</button>
       </td>
     </tr>
@@ -138,6 +153,11 @@ export default function AdminGamesPage() {
   const [todayStats, setTodayStats] = useState({ wonToday: 0, expectedToday: 0, totalSims: 0 });
   const [modalOpen, setModalOpen] = useState(false);
   const [sessions, setSessions] = useState<number[]>([]);
+  const [copyModal, setCopyModal] = useState<{ agentId: string; agentName: string } | null>(null);
+  const [copyGames, setCopyGames] = useState<Game[]>([]);
+  const [selectedCopy, setSelectedCopy] = useState<Set<string>>(new Set());
+  const [copyMsg, setCopyMsg] = useState('');
+  const [payingId, setPayingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     agentId: '',
     sessionId: '',
@@ -146,7 +166,7 @@ export default function AdminGamesPage() {
   });
 
   const load = useCallback(async () => {
-  const [agentsData, gamesData, todayData] = await Promise.all([
+    const [agentsData, gamesData, todayData] = await Promise.all([
       apiFetch<Agent[]>('/api/agents'),
       apiFetch<Game[]>('/api/games?completed=false'),
       apiFetch<{ wonToday: number; expectedToday: number; totalSims: number }>(
@@ -191,6 +211,24 @@ export default function AdminGamesPage() {
     await load();
   }, [load]);
 
+  const markPaid = useCallback(async (id: string) => {
+    if (payingId) return;
+    setPayingId(id);
+    try {
+      await apiFetch(`/api/games/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'mark_paid' }),
+      });
+      setGames((prev) => prev.filter((g) => g.id !== id));
+    } catch (err) {
+      console.error(err);
+      await load();
+    } finally {
+      setPayingId(null);
+    }
+  }, [payingId, load]);
+
   const deleteGame = useCallback(async (id: string) => {
     if (!confirm('Delete this game?')) return;
     await apiFetch(`/api/games/${id}`, { method: 'DELETE' });
@@ -201,6 +239,32 @@ export default function AdminGamesPage() {
     () => agents.filter((a) => (gamesByAgent.get(a.id) || []).length > 0),
     [agents, gamesByAgent]
   );
+
+  function openCopyModal(agent: Agent) {
+    setCopyMsg('');
+    setCopyModal({ agentId: agent.id, agentName: agent.name });
+    const active = gamesByAgent.get(agent.id) || [];
+    setCopyGames(active);
+    setSelectedCopy(new Set(active.map((g) => g.id)));
+  }
+
+  function toggleCopy(id: string) {
+    setSelectedCopy((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function copySelected() {
+    const lines = copyGames
+      .filter((g) => selectedCopy.has(g.id))
+      .map((g) => `${g.sessionId ?? g.gameName},${g.netProfit}`);
+    const text = lines.join('\n');
+    await navigator.clipboard.writeText(text);
+    setCopyMsg(`Copied ${lines.length} line(s)`);
+  }
 
   async function addGame(e: React.FormEvent) {
     e.preventDefault();
@@ -231,6 +295,7 @@ export default function AdminGamesPage() {
     <AppShell
       links={adminLinks}
       userLabel="Admin"
+      showGameTabs
       title="Games"
       subtitle="Track active winnings per agent"
       actions={
@@ -258,35 +323,52 @@ export default function AdminGamesPage() {
           </div>
         ) : (
           agentsWithGames.map((agent) => {
-          const agentGames = gamesByAgent.get(agent.id) || [];
-          return (
-            <div key={agent.id} className="card">
-              <div className="card-header">
-                <h3>{agent.name}</h3>
-                <span className="badge badge-muted">{agentGames.length} active</span>
+            const agentGames = gamesByAgent.get(agent.id) || [];
+            return (
+              <div key={agent.id} className="card">
+                <div className="card-header">
+                  <h3>{agent.name}</h3>
+                  <div className="card-header-actions">
+                    <span className="badge badge-muted">{agentGames.length} active</span>
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      title="Copy active games"
+                      onClick={() => openCopyModal(agent)}
+                    >
+                      📋
+                    </button>
+                  </div>
+                </div>
+                <div className="table-wrap">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Session</th>
+                        <th>Date</th>
+                        <th>Won</th>
+                        <th>Net 75%</th>
+                        <th>Expected</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {agentGames.map((g) => (
+                        <GameRow
+                          key={g.id}
+                          game={g}
+                          onUpdate={updateGame}
+                          onDelete={deleteGame}
+                          onMarkPaid={markPaid}
+                          markingPaid={payingId === g.id}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <div className="table-wrap">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Session</th>
-                      <th>Date</th>
-                      <th>Won</th>
-                      <th>Net 75%</th>
-                      <th>Expected</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {agentGames.map((g) => (
-                      <GameRow key={g.id} game={g} onUpdate={updateGame} onDelete={deleteGame} />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          );
-        })
+            );
+          })
         )}
       </div>
 
@@ -316,7 +398,7 @@ export default function AdminGamesPage() {
             </select>
           </div>
           <div className="field">
-            <label className="label">Session ID</label>
+            <label className="label">Session ID (available only)</label>
             <select
               value={form.sessionId}
               onChange={(e) => setForm({ ...form, sessionId: e.target.value })}
@@ -360,6 +442,42 @@ export default function AdminGamesPage() {
             </div>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={!!copyModal}
+        title={copyModal ? `Active games — ${copyModal.agentName}` : 'Active games'}
+        onClose={() => setCopyModal(null)}
+        footer={
+          <>
+            <button type="button" className="btn-secondary" onClick={() => setCopyModal(null)}>Close</button>
+            <button type="button" onClick={copySelected} disabled={selectedCopy.size === 0}>
+              Copy selected
+            </button>
+          </>
+        }
+      >
+        {copyGames.length === 0 ? (
+          <p className="empty-state" style={{ padding: '1rem 0' }}>No active games for this agent.</p>
+        ) : (
+          <div className="copy-checklist">
+            <p className="copy-hint">Format: session,Net — one per line</p>
+            {copyGames.map((g) => (
+              <label key={g.id} className="copy-check-item">
+                <input
+                  type="checkbox"
+                  checked={selectedCopy.has(g.id)}
+                  onChange={() => toggleCopy(g.id)}
+                />
+                <span>
+                  <strong>{g.gameName}</strong>
+                  <span className="copy-meta"> — Net {money(g.netProfit)} · {g.date}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+        {copyMsg && <p className="copy-success">{copyMsg}</p>}
       </Modal>
     </AppShell>
   );

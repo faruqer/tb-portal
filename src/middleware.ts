@@ -4,7 +4,7 @@ import { jwtVerify } from 'jose';
 
 const COOKIE_NAME = 'rm_session';
 
-const adminRoutes = ['/games', '/report', '/agents', '/available', '/verify'];
+const adminRoutes = ['/games', '/report', '/agents', '/available'];
 const agentRoutes = ['/agent/games', '/agent/summary', '/agent/numbers'];
 
 function getSecret() {
@@ -28,6 +28,10 @@ export async function middleware(req: NextRequest) {
 
   if (pathname === '/admin/login') {
     return NextResponse.redirect(new URL('/login', req.url));
+  }
+
+  if (pathname === '/verify' || pathname.startsWith('/verify/')) {
+    return NextResponse.redirect(new URL('/games', req.url));
   }
 
   if (pathname === '/login') {
@@ -58,11 +62,11 @@ export const config = {
     '/',
     '/login',
     '/admin/login',
+    '/verify',
     '/games/:path*',
     '/report/:path*',
     '/agents/:path*',
     '/available/:path*',
-    '/verify/:path*',
     '/agent/:path*',
   ],
 };

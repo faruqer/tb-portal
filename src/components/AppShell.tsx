@@ -12,6 +12,7 @@ interface AppShellProps {
   title: string;
   subtitle?: string;
   actions?: ReactNode;
+  showGameTabs?: boolean;
   children: ReactNode;
 }
 
@@ -23,6 +24,7 @@ export function AppShell({
   title,
   subtitle,
   actions,
+  showGameTabs = false,
   children,
 }: AppShellProps) {
   return (
@@ -34,7 +36,7 @@ export function AppShell({
         brandHref={brandHref}
       />
       <div className="page-content">
-        <GameTabs />
+        {showGameTabs && <GameTabs />}
         <div className="page-top">
           <div>
             <h1>{title}</h1>

@@ -5,8 +5,8 @@ import { jsonOk, requireAuth } from '@/lib/api-utils';
 import type { GameTotals } from '@/lib/types';
 import { addDaysStr } from '@/lib/calculations';
 import { resolveAgentId, emptyTotals, addToTotals } from '@/lib/game-utils';
-import { withGame } from '@/lib/game-filter';
-import { buildPlayDateMap, enrichSimWithDates } from '@/lib/sim-service';
+import { withGame, gameFromParam, currentGameType } from '@/lib/game-filter';
+import { enrichSimWithDates } from '@/lib/sim-service';
 
 function getWeekStart(d: Date): string {
   const copy = new Date(d);
@@ -76,6 +76,9 @@ export async function GET(req: NextRequest) {
   const date = searchParams.get('date');
   const agentId = searchParams.get('agentId');
   const type = searchParams.get('type') || 'general';
+  const gameParam = searchParams.get('game');
+  const gameKey =
+    gameParam === 'all' ? 'all' as const : gameFromParam(gameParam) ?? undefined;
 
   const filter: Record<string, unknown> = {};
   if (session!.role === 'agent') {
@@ -85,13 +88,13 @@ export async function GET(req: NextRequest) {
   }
   if (date) filter.date = date;
 
-  const games = await Game.find(await withGame(filter)).populate('agentId', 'name');
+  const games = await Game.find(await withGame(filter, gameKey)).populate('agentId', 'name');
   const totals = sumGames(games);
 
   if (type === 'today-progress') {
     const today = new Date().toISOString().slice(0, 10);
-    const wonToday = await Game.countDocuments(await withGame({ date: today }));
-    const totalSims = await SimCard.countDocuments(await withGame());
+    const wonToday = await Game.countDocuments(await withGame({ date: today }, gameKey));
+    const totalSims = await SimCard.countDocuments();
     const expectedToday = totalSims / 7;
     return jsonOk({ today, wonToday, totalSims, expectedToday });
   }
@@ -101,27 +104,25 @@ export async function GET(req: NextRequest) {
     if (session!.role === 'agent') simFilter.agentId = session!.agentId;
     else if (agentId) simFilter.agentId = agentId;
 
-    const sims = await SimCard.find(await withGame(simFilter));
-    const playMap = await buildPlayDateMap(
-      agentId || (session!.role === 'agent' ? session!.agentId : undefined)
-    );
+    const activeGameType = gameKey && gameKey !== 'all' ? gameKey : await currentGameType();
+    const sims = await SimCard.find(simFilter);
     let available = 0;
     for (const s of sims) {
-      const dates = enrichSimWithDates(s.agentId.toString(), s.toObject(), playMap);
+      const dates = enrichSimWithDates(s.toObject(), activeGameType);
       if (dates.isAvailable) available++;
     }
     return jsonOk({ total: sims.length, inUse: sims.length - available, free: available });
   }
 
   if (type === 'agent-sims') {
-    const agents = await Agent.find(await withGame()).sort({ name: 1 });
-    const sims = await SimCard.find(await withGame());
-    const playMap = await buildPlayDateMap();
+    const activeGameType = gameKey && gameKey !== 'all' ? gameKey : await currentGameType();
+    const agents = await Agent.find().sort({ name: 1 });
+    const sims = await SimCard.find();
     const summary = agents.map((agent) => {
       const agentSims = sims.filter((s) => s.agentId.toString() === agent._id.toString());
       let free = 0;
       for (const s of agentSims) {
-        if (enrichSimWithDates(agent._id.toString(), s.toObject(), playMap).isAvailable) free++;
+        if (enrichSimWithDates(s.toObject(), activeGameType).isAvailable) free++;
       }
       return {
         agentId: agent._id.toString(),
@@ -184,7 +185,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (type === 'by-agent' && session!.role === 'admin') {
-    const agents = await Agent.find(await withGame());
+    const agents = await Agent.find();
     const byAgent = agents.map((agent) => {
       const agentIdStr = agent._id.toString();
       const agentGames = games.filter((g) => resolveAgentId(g.agentId) === agentIdStr);

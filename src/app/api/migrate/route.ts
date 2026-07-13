@@ -3,7 +3,6 @@ import { readFile } from 'fs/promises';
 import path from 'path';
 import { getModels } from '@/lib/mongodb';
 import { getSession, hashPassword } from '@/lib/auth';
-
 import { calcNetProfit, calcExpectedToReceive, parseSessionId } from '@/lib/calculations';
 import { withGame, gameScope } from '@/lib/game-filter';
 import { jsonOk, jsonError, requireAdmin } from '@/lib/api-utils';
@@ -19,7 +18,7 @@ export async function POST(req: NextRequest) {
   const { Agent, Game, SimCard } = await getModels();
   const scope = await gameScope();
 
-  const existingAgents = await Agent.countDocuments(await withGame());
+  const existingAgents = await Agent.countDocuments();
   if (existingAgents > 0 && !body.force) {
     return jsonError('Database already has data. Pass force:true to re-import.');
   }
@@ -41,9 +40,9 @@ export async function POST(req: NextRequest) {
   if (body.force) {
     const gameFilter = await withGame();
     await Promise.all([
-      Agent.deleteMany(gameFilter),
+      Agent.deleteMany({}),
       Game.deleteMany(gameFilter),
-      SimCard.deleteMany(gameFilter),
+      SimCard.deleteMany({}),
     ]);
   }
 
@@ -56,7 +55,6 @@ export async function POST(req: NextRequest) {
       name: a.name,
       username,
       passwordHash: await hashPassword('changeme123'),
-      ...scope,
     });
     agentMap.set(a.id, agent._id.toString());
   }
@@ -100,7 +98,6 @@ export async function POST(req: NextRequest) {
       phoneNumber: String(s.phoneNumber || ''),
       sessionId: parseSessionId(String(s.profileName || '0')),
       createdAt: s.createdAt ? new Date(String(s.createdAt)) : new Date(),
-      ...scope,
     });
   }
 
