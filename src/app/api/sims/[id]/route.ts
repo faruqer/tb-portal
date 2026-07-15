@@ -27,6 +27,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (body.nextPlayingAt !== undefined) {
     sim.nextPlayingAtOverride = body.nextPlayingAt ? new Date(body.nextPlayingAt) : null;
   }
+  if (body.next35kAt !== undefined) {
+    sim.nextPlaying35kAtOverride = body.next35kAt ? new Date(body.next35kAt) : null;
+  }
+  if (body.next20kAt !== undefined) {
+    sim.nextPlaying20kAtOverride = body.next20kAt ? new Date(body.next20kAt) : null;
+  }
 
   await sim.save();
   return jsonOk(serializeDoc(sim.toObject()));

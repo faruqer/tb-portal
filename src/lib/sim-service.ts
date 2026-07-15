@@ -9,13 +9,33 @@ export function lastPlayedField(gameType: GameKey): 'lastPlayed35kAt' | 'lastPla
   return gameType === '35k' ? 'lastPlayed35kAt' : 'lastPlayed20kAt';
 }
 
-function simOverrides(obj: {
-  lastPlayedAtOverride?: Date | null;
-  nextPlayingAtOverride?: Date | null;
-}) {
+function gameNextOverride(
+  obj: {
+    nextPlaying35kAtOverride?: Date | null;
+    nextPlaying20kAtOverride?: Date | null;
+    nextPlayingAtOverride?: Date | null;
+  },
+  gameType: GameKey
+): Date | null {
+  const specific = gameType === '35k' ? obj.nextPlaying35kAtOverride : obj.nextPlaying20kAtOverride;
+  if (specific) return new Date(specific);
+  if (obj.nextPlayingAtOverride) return new Date(obj.nextPlayingAtOverride);
+  return null;
+}
+
+function simOverrides(
+  obj: {
+    lastPlayedAtOverride?: Date | null;
+    nextPlaying35kAtOverride?: Date | null;
+    nextPlaying20kAtOverride?: Date | null;
+    nextPlayingAtOverride?: Date | null;
+  },
+  gameType: GameKey
+) {
   const overrides: { lastPlayedAt?: Date; nextPlayingAt?: Date } = {};
   if (obj.lastPlayedAtOverride) overrides.lastPlayedAt = new Date(obj.lastPlayedAtOverride);
-  if (obj.nextPlayingAtOverride) overrides.nextPlayingAt = new Date(obj.nextPlayingAtOverride);
+  const next = gameNextOverride(obj, gameType);
+  if (next) overrides.nextPlayingAt = next;
   return overrides.lastPlayedAt || overrides.nextPlayingAt ? overrides : undefined;
 }
 
@@ -24,19 +44,23 @@ export function enrichSimWithDates(
     lastPlayed35kAt?: Date | null;
     lastPlayed20kAt?: Date | null;
     lastPlayedAtOverride?: Date | null;
+    nextPlaying35kAtOverride?: Date | null;
+    nextPlaying20kAtOverride?: Date | null;
     nextPlayingAtOverride?: Date | null;
   },
   gameType: GameKey
 ): SimComputed {
   const stored = simObj[lastPlayedField(gameType)];
   const lastPlayed = stored ? new Date(stored) : null;
-  return computeSimDates(lastPlayed, simOverrides(simObj));
+  return computeSimDates(lastPlayed, simOverrides(simObj, gameType));
 }
 
 export function enrichSimBothGames(simObj: {
   lastPlayed35kAt?: Date | null;
   lastPlayed20kAt?: Date | null;
   lastPlayedAtOverride?: Date | null;
+  nextPlaying35kAtOverride?: Date | null;
+  nextPlaying20kAtOverride?: Date | null;
   nextPlayingAtOverride?: Date | null;
 }) {
   return {

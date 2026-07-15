@@ -59,6 +59,26 @@ export function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+export function localDateStr(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+export function todayLocalStr(): string {
+  return localDateStr(new Date());
+}
+
+/** Not available yet, but cooldown ends later today (local time). */
+export function isCooldownDueLaterToday(sim: {
+  isAvailable: boolean;
+  nextPlayingAt: string | null;
+}): boolean {
+  if (sim.isAvailable || !sim.nextPlayingAt) return false;
+  const next = new Date(sim.nextPlayingAt);
+  if (Number.isNaN(next.getTime()) || next.getTime() <= Date.now()) return false;
+  return localDateStr(next) === todayLocalStr();
+}
+
 export function fromDatetimeLocal(value: string): string | null {
   if (!value?.trim()) return null;
   const d = new Date(value);

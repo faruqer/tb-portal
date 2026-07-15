@@ -11,6 +11,8 @@ export const SimCardSchema = new Schema(
     lastPlayed20kAt: { type: Date, default: null },
     lastPlayedAtOverride: { type: Date, default: null },
     nextPlayingAtOverride: { type: Date, default: null },
+    nextPlaying35kAtOverride: { type: Date, default: null },
+    nextPlaying20kAtOverride: { type: Date, default: null },
   },
   { timestamps: true }
 );

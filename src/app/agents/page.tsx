@@ -8,7 +8,7 @@ import { PhoneReveal } from '@/components/PhoneReveal';
 import { PhoneRevealProvider, ShowAllNumbersButton } from '@/components/PhoneRevealContext';
 import { LoadingBlock } from '@/components/LoadingBlock';
 import { useSession, apiFetch } from '@/lib/hooks';
-import { formatDateTime } from '@/lib/calculations';
+import { fromDatetimeLocal, toDatetimeLocal } from '@/lib/calculations';
 import { sortSims, groupColorClass } from '@/lib/sort-sims';
 import type { SimSortMode } from '@/lib/types';
 
@@ -26,12 +26,49 @@ interface Sim {
   groupId: string | null;
   next35kAt: string | null;
   next35kReady: boolean;
+  next35kAtOverride: string | null;
   next20kAt: string | null;
   next20kReady: boolean;
+  next20kAtOverride: string | null;
 }
 
-function nextPlayLabel(ready: boolean, at: string | null): string {
-  return ready ? 'Ready' : formatDateTime(at);
+function NextPlayInput({
+  ready,
+  at,
+  overrideAt,
+  inputKey,
+  onSave,
+}: {
+  ready: boolean;
+  at: string | null;
+  overrideAt: string | null;
+  inputKey: string;
+  onSave: (value: string | null) => void;
+}) {
+  const showDate = !ready || !!overrideAt;
+
+  return (
+    <div className="next-play-edit">
+      {ready && !overrideAt && <span className="next-play-ready">Ready</span>}
+      <input
+        key={inputKey}
+        type="datetime-local"
+        className="inline-input next-play-input"
+        defaultValue={showDate ? toDatetimeLocal(at) : ''}
+        title="Edit next play date and time"
+        onBlur={(e) => {
+          const raw = e.target.value.trim();
+          if (!raw) {
+            if (overrideAt) onSave(null);
+            return;
+          }
+          const iso = fromDatetimeLocal(raw);
+          if (!iso) return;
+          if (iso !== at || overrideAt !== iso) onSave(iso);
+        }}
+      />
+    </div>
+  );
 }
 
 export default function AgentsPage() {
@@ -273,10 +310,22 @@ export default function AgentsPage() {
                         {s.groupId && <span className="badge-group">{s.groupId}</span>}
                       </td>
                       <td className="next-play-cell next-play-35k">
-                        {nextPlayLabel(s.next35kReady, s.next35kAt)}
+                        <NextPlayInput
+                          ready={s.next35kReady}
+                          at={s.next35kAt}
+                          overrideAt={s.next35kAtOverride}
+                          inputKey={`${s.id}-35k-${s.next35kAt}-${s.next35kAtOverride}`}
+                          onSave={(value) => updateSim(s.id, { next35kAt: value })}
+                        />
                       </td>
                       <td className="next-play-cell next-play-20k">
-                        {nextPlayLabel(s.next20kReady, s.next20kAt)}
+                        <NextPlayInput
+                          ready={s.next20kReady}
+                          at={s.next20kAt}
+                          overrideAt={s.next20kAtOverride}
+                          inputKey={`${s.id}-20k-${s.next20kAt}-${s.next20kAtOverride}`}
+                          onSave={(value) => updateSim(s.id, { next20kAt: value })}
+                        />
                       </td>
                       <td>
                         <button type="button" className="btn-danger btn-sm" onClick={() => deleteSim(s.id)}>×</button>

@@ -7,7 +7,7 @@ import { PhoneReveal } from '@/components/PhoneReveal';
 import { PhoneRevealProvider, ShowAllNumbersButton } from '@/components/PhoneRevealContext';
 import { LoadingBlock } from '@/components/LoadingBlock';
 import { useSession, apiFetch } from '@/lib/hooks';
-import { formatDateTime } from '@/lib/calculations';
+import { formatDateTime, isCooldownDueLaterToday } from '@/lib/calculations';
 import { sortSims, groupColorClass } from '@/lib/sort-sims';
 import type { SimSortMode } from '@/lib/types';
 
@@ -37,7 +37,11 @@ function SimTable({ sims, emptyMessage }: { sims: Sim[]; emptyMessage: string })
         </thead>
         <tbody>
           {sims.map((s) => (
-            <tr key={s.id} className={groupColorClass(s.groupId)}>
+            <tr
+              key={s.id}
+              className={[groupColorClass(s.groupId), isCooldownDueLaterToday(s) ? 'sim-due-today' : ''].filter(Boolean).join(' ')}
+              title={isCooldownDueLaterToday(s) ? 'Available later today — play when the time is reached' : undefined}
+            >
               <td>{s.agentName}</td>
               <td><strong>{s.sessionId}</strong></td>
               <td><PhoneReveal phone={s.phoneNumber} /></td>
@@ -169,6 +173,9 @@ export default function AvailablePage() {
             <div className="card-header">
               <h3>Waiting for 7-day cooldown</h3>
               <span className="badge badge-warning">{waitingSims.length} · {sortLabel}</span>
+              {waitingSims.some(isCooldownDueLaterToday) && (
+                <span className="badge sim-due-today-badge">Red border = due later today</span>
+              )}
             </div>
             <SimTable sims={waitingSims} emptyMessage="No SIM cards on cooldown" />
           </div>

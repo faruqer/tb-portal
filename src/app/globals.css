@@ -471,6 +471,25 @@ html { height: 100%; }
   color: #a16207;
 }
 
+.next-play-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 11rem;
+}
+
+.next-play-ready {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--success, #22c55e);
+}
+
+.next-play-input {
+  width: 100%;
+  min-width: 10.5rem;
+  font-size: 0.78rem;
+}
+
 .card-header {
   display: flex;
   align-items: center;
@@ -595,6 +614,26 @@ tr.group-e .badge-group { background: rgba(244, 63, 94, 0.35); color: #fecdd3; b
 tr.group-f td { background: rgba(6, 182, 212, 0.1); }
 tr.group-f td:first-child { box-shadow: inset 4px 0 0 #06b6d4; }
 tr.group-f .badge-group { background: rgba(6, 182, 212, 0.35); color: #a5f3fc; border: 1px solid rgba(6, 182, 212, 0.55); }
+
+tr.sim-due-today td {
+  border-top: 2px solid rgba(239, 68, 68, 0.8);
+  border-bottom: 2px solid rgba(239, 68, 68, 0.8);
+}
+
+tr.sim-due-today td:first-child {
+  box-shadow: inset 4px 0 0 #ef4444;
+  border-left: 2px solid rgba(239, 68, 68, 0.8);
+}
+
+tr.sim-due-today td:last-child {
+  border-right: 2px solid rgba(239, 68, 68, 0.8);
+}
+
+.sim-due-today-badge {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fecaca;
+  border: 1px solid rgba(239, 68, 68, 0.55);
+}
 
 /* ── Forms ── */
 .field { margin-bottom: 1rem; }

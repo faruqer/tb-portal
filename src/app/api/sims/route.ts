@@ -27,6 +27,7 @@ function mapSimResponseBoth(obj: Record<string, unknown>, agentId: string) {
   const agent = obj.agentId as { _id?: { toString(): string }; name?: string };
   const aid = agent?._id?.toString?.() ?? agentId;
   const both = enrichSimBothGames(obj as never);
+  const toIso = (v: unknown) => (v ? new Date(v as string | Date).toISOString() : null);
   return {
     ...serializeDoc(obj as never),
     agentId: aid,
@@ -34,8 +35,10 @@ function mapSimResponseBoth(obj: Record<string, unknown>, agentId: string) {
     groupId: obj.groupId ?? null,
     next35kAt: both['35k'].nextPlayingAt,
     next35kReady: both['35k'].isAvailable,
+    next35kAtOverride: toIso(obj.nextPlaying35kAtOverride),
     next20kAt: both['20k'].nextPlayingAt,
     next20kReady: both['20k'].isAvailable,
+    next20kAtOverride: toIso(obj.nextPlaying20kAtOverride),
   };
 }
 
