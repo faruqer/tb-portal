@@ -7,6 +7,7 @@ import { SummaryGrid } from '@/components/SummaryGrid';
 import { DayMetrics } from '@/components/DayMetrics';
 import { ReportChart, type ChartData, type MetricKey } from '@/components/ReportChart';
 import { ReportGameFilter } from '@/components/ReportGameFilter';
+import { LoadingBlock } from '@/components/LoadingBlock';
 import { useSession, apiFetch } from '@/lib/hooks';
 import { money } from '@/lib/calculations';
 import { gameBadgeClass, gameRowClass, gameTypeLabel } from '@/lib/game-styles';
@@ -39,6 +40,7 @@ export default function ReportPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [historyGames, setHistoryGames] = useState<Game[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyReady, setHistoryReady] = useState(false);
   const [unpayingId, setUnpayingId] = useState<string | null>(null);
   const [filterAgent, setFilterAgent] = useState('');
   const [filterDate, setFilterDate] = useState('');
@@ -46,12 +48,17 @@ export default function ReportPage() {
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
   const [weekStart, setWeekStart] = useState(getWeekStart());
   const [monthData, setMonthData] = useState<{ byDay: Record<string, GameTotals>; totals: GameTotals } | null>(null);
+  const [monthLoading, setMonthLoading] = useState(false);
   const [weekData, setWeekData] = useState<{ byDay: Record<string, GameTotals>; totals: GameTotals; weekStart: string; weekEnd: string } | null>(null);
+  const [weekLoading, setWeekLoading] = useState(false);
   const [agentSummaries, setAgentSummaries] = useState<AgentSummary[]>([]);
   const [chartPeriod, setChartPeriod] = useState<'day' | 'week' | 'month'>('week');
   const [chartData, setChartData] = useState<ChartData | null>(null);
+  const [chartLoading, setChartLoading] = useState(false);
   const [chartMetrics, setChartMetrics] = useState<Set<MetricKey>>(new Set(['won', 'net', 'expected', 'received']));
   const [reportGame, setReportGame] = useState<GameFilter>('all');
+  const [dataLoading, setDataLoading] = useState(true);
+  const [dataReady, setDataReady] = useState(false);
 
   const gq = useCallback((path: string) => {
     const sep = path.includes('?') ? '&' : '?';
@@ -59,12 +66,20 @@ export default function ReportPage() {
   }, [reportGame]);
 
   const load = useCallback(async () => {
-    const [agentsData, byAgent] = await Promise.all([
-      apiFetch<Agent[]>('/api/agents'),
-      apiFetch<AgentSummary[]>(gq('/api/summary?type=by-agent')),
-    ]);
-    setAgents(agentsData);
-    setAgentSummaries(byAgent);
+    setDataLoading(true);
+    try {
+      const [agentsData, byAgent] = await Promise.all([
+        apiFetch<Agent[]>('/api/agents'),
+        apiFetch<AgentSummary[]>(gq('/api/summary?type=by-agent')),
+      ]);
+      setAgents(agentsData);
+      setAgentSummaries(byAgent);
+      setDataReady(true);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDataLoading(false);
+    }
   }, [gq]);
 
   const loadHistory = useCallback(async () => {
@@ -73,6 +88,7 @@ export default function ReportPage() {
       const gameParam = reportGame === 'all' ? 'all' : reportGame;
       const data = await apiFetch<Game[]>(`/api/games?paymentStatus=paid&game=${gameParam}`);
       setHistoryGames(data);
+      setHistoryReady(true);
     } catch (err) {
       console.error(err);
     } finally {
@@ -90,23 +106,34 @@ export default function ReportPage() {
 
   useEffect(() => {
     if (view === 'calendar' && !loading) {
+      setMonthLoading(true);
       apiFetch<{ byDay: Record<string, GameTotals>; totals: GameTotals }>(gq(`/api/summary?type=monthly&month=${month}`))
-        .then(setMonthData).catch(console.error);
+        .then(setMonthData)
+        .catch(console.error)
+        .finally(() => setMonthLoading(false));
     }
   }, [view, month, loading, gq]);
 
   useEffect(() => {
     if (view === 'weekly' && !loading) {
+      setWeekLoading(true);
       apiFetch<{ byDay: Record<string, GameTotals>; totals: GameTotals; weekStart: string; weekEnd: string }>(
         gq(`/api/summary?type=weekly&weekStart=${weekStart}`)
-      ).then(setWeekData).catch(console.error);
+      )
+        .then(setWeekData)
+        .catch(console.error)
+        .finally(() => setWeekLoading(false));
     }
   }, [view, weekStart, loading, gq]);
 
   useEffect(() => {
     if (view === 'chart' && !loading) {
+      setChartLoading(true);
+      setChartData(null);
       apiFetch<ChartData>(gq(`/api/summary?type=chart&period=${chartPeriod}`))
-        .then(setChartData).catch(console.error);
+        .then(setChartData)
+        .catch(console.error)
+        .finally(() => setChartLoading(false));
     }
   }, [view, chartPeriod, loading, gq]);
 
@@ -204,7 +231,14 @@ export default function ReportPage() {
     return days;
   }
 
-  if (loading) return <div className="loading-screen">Loading…</div>;
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner" aria-hidden="true" />
+        <span>Loading…</span>
+      </div>
+    );
+  }
 
   return (
     <AppShell
@@ -227,7 +261,10 @@ export default function ReportPage() {
       }
     >
       {view === 'general' && (
-        <div className="card-stack">
+        !dataReady && dataLoading ? (
+          <div className="card"><LoadingBlock label="Loading report…" /></div>
+        ) : (
+        <div className={`card-stack${dataLoading && dataReady ? ' content-refreshing' : ''}`}>
           <div className="card"><SummaryGrid totals={totals} label="All-time totals" /></div>
           <div className="card">
             <div className="card-header"><h3>Per Agent</h3></div>
@@ -250,10 +287,14 @@ export default function ReportPage() {
             </div>
           </div>
         </div>
+        )
       )}
 
       {view === 'weekly' && (
-        <div className="card-stack">
+        weekLoading && !weekData ? (
+          <div className="card"><LoadingBlock label="Loading week…" /></div>
+        ) : (
+        <div className={`card-stack${weekLoading && weekData ? ' content-refreshing' : ''}`}>
           <div className="card">
             <div className="card-header">
               <h3>Week of {weekStart}</h3>
@@ -263,6 +304,7 @@ export default function ReportPage() {
             <div className="week-bar" style={{ marginTop: '1.25rem' }}>{renderWeekBar()}</div>
           </div>
         </div>
+        )
       )}
 
       {view === 'chart' && (
@@ -289,7 +331,7 @@ export default function ReportPage() {
               </button>
             ))}
           </div>
-          {chartData ? <ReportChart data={chartData} activeMetrics={chartMetrics} /> : <div className="empty-state">Loading chart…</div>}
+          {chartLoading || !chartData ? <LoadingBlock label="Loading chart…" compact /> : <ReportChart data={chartData} activeMetrics={chartMetrics} />}
         </div>
       )}
 
@@ -319,8 +361,8 @@ export default function ReportPage() {
               <table className="data-table">
                 <thead><tr><th>Date</th><th>Game</th><th>Agent</th><th>Session</th><th>Won</th><th>Net</th><th>Expected</th><th>Received</th><th></th></tr></thead>
                 <tbody>
-                  {historyLoading ? (
-                    <tr><td colSpan={9} className="empty-state">Loading…</td></tr>
+                  {historyLoading || !historyReady ? (
+                    <tr><td colSpan={9}><LoadingBlock label="Loading paid history…" compact /></td></tr>
                   ) : filteredHistory.length === 0 ? (
                     <tr><td colSpan={9} className="empty-state">No paid games found</td></tr>
                   ) : (
@@ -356,7 +398,10 @@ export default function ReportPage() {
       )}
 
       {view === 'calendar' && (
-        <div className="card">
+        monthLoading && !monthData ? (
+          <div className="card"><LoadingBlock label="Loading calendar…" /></div>
+        ) : (
+        <div className={`card${monthLoading && monthData ? ' content-refreshing' : ''}`}>
           <div className="card-header">
             <h3>Monthly Calendar</h3>
             <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={{ width: 'auto' }} />
@@ -364,6 +409,7 @@ export default function ReportPage() {
           {monthData && <SummaryGrid totals={monthData.totals} />}
           <div className="calendar-grid" style={{ marginTop: '1.25rem' }}>{renderCalendar()}</div>
         </div>
+        )
       )}
     </AppShell>
   );

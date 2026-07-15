@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { adminLinks } from '@/components/NavBar';
 import { Modal } from '@/components/Modal';
+import { LoadingBlock } from '@/components/LoadingBlock';
 import { useSession, apiFetch } from '@/lib/hooks';
 import { calcExpectedToReceive, calcNetProfit, money, amountInput } from '@/lib/calculations';
 
@@ -158,6 +159,9 @@ export default function AdminGamesPage() {
   const [selectedCopy, setSelectedCopy] = useState<Set<string>>(new Set());
   const [copyMsg, setCopyMsg] = useState('');
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [dataReady, setDataReady] = useState(false);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
   const [form, setForm] = useState({
     agentId: '',
     sessionId: '',
@@ -166,16 +170,24 @@ export default function AdminGamesPage() {
   });
 
   const load = useCallback(async () => {
-    const [agentsData, gamesData, todayData] = await Promise.all([
-      apiFetch<Agent[]>('/api/agents'),
-      apiFetch<Game[]>('/api/games?completed=false'),
-      apiFetch<{ wonToday: number; expectedToday: number; totalSims: number }>(
-        '/api/summary?type=today-progress'
-      ),
-    ]);
-    setAgents(agentsData);
-    setGames(gamesData);
-    setTodayStats(todayData);
+    setDataLoading(true);
+    try {
+      const [agentsData, gamesData, todayData] = await Promise.all([
+        apiFetch<Agent[]>('/api/agents'),
+        apiFetch<Game[]>('/api/games?completed=false'),
+        apiFetch<{ wonToday: number; expectedToday: number; totalSims: number }>(
+          '/api/summary?type=today-progress'
+        ),
+      ]);
+      setAgents(agentsData);
+      setGames(gamesData);
+      setTodayStats(todayData);
+      setDataReady(true);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDataLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -183,13 +195,22 @@ export default function AdminGamesPage() {
   }, [loading, load]);
 
   useEffect(() => {
+    const onGameChange = () => { load().catch(console.error); };
+    window.addEventListener('rm-game-change', onGameChange);
+    return () => window.removeEventListener('rm-game-change', onGameChange);
+  }, [load]);
+
+  useEffect(() => {
     if (!form.agentId) {
       setSessions([]);
+      setSessionsLoading(false);
       return;
     }
+    setSessionsLoading(true);
     apiFetch<number[]>(`/api/agents/${form.agentId}/sessions?available=true`)
       .then(setSessions)
-      .catch(() => setSessions([]));
+      .catch(() => setSessions([]))
+      .finally(() => setSessionsLoading(false));
   }, [form.agentId]);
 
   const gamesByAgent = useMemo(() => {
@@ -289,7 +310,14 @@ export default function AdminGamesPage() {
   const net = calcNetProfit(won);
   const expected = calcExpectedToReceive(net);
 
-  if (loading) return <div className="loading-screen">Loading…</div>;
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner" aria-hidden="true" />
+        <span>Loading…</span>
+      </div>
+    );
+  }
 
   return (
     <AppShell
@@ -316,8 +344,12 @@ export default function AdminGamesPage() {
         </div>
       }
     >
-      <div className="card-stack">
-        {agentsWithGames.length === 0 ? (
+      <div className={`card-stack${dataLoading && dataReady ? ' content-refreshing' : ''}`}>
+        {!dataReady && dataLoading ? (
+          <div className="card">
+            <LoadingBlock label="Loading games…" />
+          </div>
+        ) : agentsWithGames.length === 0 ? (
           <div className="card">
             <div className="empty-state">No active games</div>
           </div>
@@ -403,9 +435,15 @@ export default function AdminGamesPage() {
               value={form.sessionId}
               onChange={(e) => setForm({ ...form, sessionId: e.target.value })}
               required
-              disabled={!form.agentId}
+              disabled={!form.agentId || sessionsLoading}
             >
-              <option value="">{sessions.length === 0 ? 'No available sessions' : 'Select session…'}</option>
+              <option value="">
+                {sessionsLoading
+                  ? 'Loading sessions…'
+                  : sessions.length === 0
+                    ? 'No available sessions'
+                    : 'Select session…'}
+              </option>
               {sessions.map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}

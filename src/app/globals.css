@@ -824,10 +824,49 @@ button:disabled, .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: 
   position: relative;
   z-index: 1;
   min-height: 100vh;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
   color: var(--text-muted);
   font-size: 0.95rem;
+}
+
+.loading-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  min-height: 220px;
+  padding: 2.5rem 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.loading-block-compact {
+  min-height: 120px;
+  padding: 1.5rem 1rem;
+}
+
+.loading-spinner {
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 3px solid rgba(255, 255, 255, 0.12);
+  border-top-color: rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  animation: loading-spin 0.75s linear infinite;
+}
+
+.content-refreshing {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+@keyframes loading-spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ── Game tabs (35K / 20K) ── */

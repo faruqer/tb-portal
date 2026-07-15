@@ -47,8 +47,8 @@ export function GameTabs({ selectOnly = false }: GameTabsProps) {
       if (!res.ok) return;
       setCurrent(key);
       if (selectOnly) return;
+      window.dispatchEvent(new CustomEvent('rm-game-change', { detail: key }));
       router.refresh();
-      window.location.reload();
     } finally {
       setSwitching(false);
     }

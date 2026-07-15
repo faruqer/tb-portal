@@ -5,6 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { agentLinks } from '@/components/NavBar';
 import { ReportGameFilter } from '@/components/ReportGameFilter';
 import { SummaryGrid } from '@/components/SummaryGrid';
+import { LoadingBlock } from '@/components/LoadingBlock';
 import { useSession, apiFetch } from '@/lib/hooks';
 import { money } from '@/lib/calculations';
 import { gameBadgeClass, gameRowClass, gameTypeLabel } from '@/lib/game-styles';
@@ -28,6 +29,8 @@ export default function AgentSummaryPage() {
   const [history, setHistory] = useState<HistoryGame[]>([]);
   const [filterDate, setFilterDate] = useState('');
   const [reportGame, setReportGame] = useState<GameFilter>('all');
+  const [dataLoading, setDataLoading] = useState(true);
+  const [dataReady, setDataReady] = useState(false);
 
   const gq = useCallback((path: string) => {
     const sep = path.includes('?') ? '&' : '?';
@@ -35,18 +38,33 @@ export default function AgentSummaryPage() {
   }, [reportGame]);
 
   const load = useCallback(async () => {
-    const datePart = filterDate ? `&date=${filterDate}` : '';
-    const [summaryData, historyGames] = await Promise.all([
-      apiFetch<{ totals: GameTotals }>(gq(`/api/summary?type=general${datePart}`)),
-      apiFetch<HistoryGame[]>('/api/games?completed=true&game=all'),
-    ]);
-    setTotals(summaryData.totals);
-    setHistory(historyGames);
+    setDataLoading(true);
+    try {
+      const datePart = filterDate ? `&date=${filterDate}` : '';
+      const [summaryData, historyGames] = await Promise.all([
+        apiFetch<{ totals: GameTotals }>(gq(`/api/summary?type=general${datePart}`)),
+        apiFetch<HistoryGame[]>('/api/games?completed=true&game=all'),
+      ]);
+      setTotals(summaryData.totals);
+      setHistory(historyGames);
+      setDataReady(true);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDataLoading(false);
+    }
   }, [filterDate, gq]);
 
   useEffect(() => { if (!loading) load().catch(console.error); }, [loading, load]);
 
-  if (loading) return <div className="loading-screen">Loading…</div>;
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner" aria-hidden="true" />
+        <span>Loading…</span>
+      </div>
+    );
+  }
 
   return (
     <AppShell
@@ -64,7 +82,11 @@ export default function AgentSummaryPage() {
         </div>
       }
     >
-      <div className="card-stack">
+      <div className={`card-stack${dataLoading && dataReady ? ' content-refreshing' : ''}`}>
+        {!dataReady && dataLoading ? (
+          <div className="card"><LoadingBlock label="Loading summary…" /></div>
+        ) : (
+        <>
         <div className="card">
           <SummaryGrid totals={totals} label={filterDate ? `Summary for ${filterDate}` : 'All-time summary'} />
         </div>
@@ -117,6 +139,8 @@ export default function AgentSummaryPage() {
             </table>
           </div>
         </div>
+        </>
+        )}
       </div>
     </AppShell>
   );

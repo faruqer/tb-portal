@@ -69,9 +69,8 @@ export async function POST(req: NextRequest) {
   const { Game } = await getModels();
   const availableSims = await getAvailableSims(agentId, scopeKey);
   const availableIds = new Set(availableSims.map((s) => s.sessionId));
-  const activeGame = await Game.findOne(await withGame({ agentId, sessionId: sid, completed: 'pending' }, scopeKey));
-  if (!availableIds.has(sid) || activeGame) {
-    return jsonError('Session is not available yet (7-day cooldown or active game)');
+  if (!availableIds.has(sid)) {
+    return jsonError('Session is not available yet (7-day cooldown)');
   }
 
   const ownedSessions = await getAgentSessionIds(agentId);

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { agentLinks } from '@/components/NavBar';
+import { LoadingBlock } from '@/components/LoadingBlock';
 import { useSession, apiFetch } from '@/lib/hooks';
 import { money } from '@/lib/calculations';
 import { gameBadgeClass, gameRowClass, gameTypeLabel } from '@/lib/game-styles';
@@ -21,16 +22,33 @@ interface Game {
 export default function AgentGamesPage() {
   const { session, loading } = useSession('agent');
   const [games, setGames] = useState<Game[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [dataReady, setDataReady] = useState(false);
 
   const load = useCallback(async () => {
-    setGames(await apiFetch<Game[]>('/api/games?completed=false&game=all'));
+    setDataLoading(true);
+    try {
+      setGames(await apiFetch<Game[]>('/api/games?completed=false&game=all'));
+      setDataReady(true);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDataLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     if (!loading) load().catch(console.error);
   }, [loading, load]);
 
-  if (loading) return <div className="loading-screen">Loading…</div>;
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner" aria-hidden="true" />
+        <span>Loading…</span>
+      </div>
+    );
+  }
 
   return (
     <AppShell
@@ -46,6 +64,9 @@ export default function AgentGamesPage() {
         <span className="game-legend-item"><span className="game-legend-swatch game-legend-20k" /> 20K</span>
       </div>
       <div className="card">
+        {!dataReady && dataLoading ? (
+          <LoadingBlock label="Loading your games…" />
+        ) : (
         <div className="table-wrap">
           <table className="data-table">
             <thead>
@@ -84,6 +105,7 @@ export default function AgentGamesPage() {
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </AppShell>
   );

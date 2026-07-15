@@ -6,6 +6,7 @@ import { adminLinks } from '@/components/NavBar';
 import { Modal } from '@/components/Modal';
 import { PhoneReveal } from '@/components/PhoneReveal';
 import { PhoneRevealProvider, ShowAllNumbersButton } from '@/components/PhoneRevealContext';
+import { LoadingBlock } from '@/components/LoadingBlock';
 import { useSession, apiFetch } from '@/lib/hooks';
 import { formatDateTime } from '@/lib/calculations';
 import { sortSims, groupColorClass } from '@/lib/sort-sims';
@@ -45,6 +46,8 @@ export default function AgentsPage() {
   const [agentForm, setAgentForm] = useState({ name: '', username: '', password: '' });
   const [editForm, setEditForm] = useState({ name: '', username: '', password: '' });
   const [simForm, setSimForm] = useState({ phoneNumber: '', sessionId: '1', groupId: '' });
+  const [dataLoading, setDataLoading] = useState(true);
+  const [dataReady, setDataReady] = useState(false);
 
   function nextSessionIdForAgent(agentId: string): number {
     const ids = sims.filter((s) => s.agentId === agentId).map((s) => s.sessionId);
@@ -69,13 +72,21 @@ export default function AgentsPage() {
   }, [sims, selectedAgent]);
 
   const load = useCallback(async () => {
-    const [agentsData, simsData] = await Promise.all([
-      apiFetch<Agent[]>('/api/agents'),
-      apiFetch<Sim[]>('/api/sims?both=true'),
-    ]);
-    setAgents(agentsData);
-    setSims(simsData);
-    if (!selectedAgent && agentsData.length > 0) setSelectedAgent(agentsData[0].id);
+    setDataLoading(true);
+    try {
+      const [agentsData, simsData] = await Promise.all([
+        apiFetch<Agent[]>('/api/agents'),
+        apiFetch<Sim[]>('/api/sims?both=true'),
+      ]);
+      setAgents(agentsData);
+      setSims(simsData);
+      if (!selectedAgent && agentsData.length > 0) setSelectedAgent(agentsData[0].id);
+      setDataReady(true);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDataLoading(false);
+    }
   }, [selectedAgent]);
 
   useEffect(() => {
@@ -147,7 +158,14 @@ export default function AgentsPage() {
     await load();
   }
 
-  if (loading) return <div className="loading-screen">Loading…</div>;
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner" aria-hidden="true" />
+        <span>Loading…</span>
+      </div>
+    );
+  }
 
   return (
     <PhoneRevealProvider>
@@ -211,7 +229,9 @@ export default function AgentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {agentSims.length === 0 ? (
+                {!dataReady && dataLoading ? (
+                  <tr><td colSpan={6}><LoadingBlock label="Loading SIM cards…" compact /></td></tr>
+                ) : agentSims.length === 0 ? (
                   <tr><td colSpan={6} className="empty-state">No SIM cards</td></tr>
                 ) : (
                   agentSims.map((s) => (

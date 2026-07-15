@@ -5,6 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { adminLinks } from '@/components/NavBar';
 import { PhoneReveal } from '@/components/PhoneReveal';
 import { PhoneRevealProvider, ShowAllNumbersButton } from '@/components/PhoneRevealContext';
+import { LoadingBlock } from '@/components/LoadingBlock';
 import { useSession, apiFetch } from '@/lib/hooks';
 import { formatDateTime } from '@/lib/calculations';
 import { sortSims, groupColorClass } from '@/lib/sort-sims';
@@ -58,19 +59,35 @@ export default function AvailablePage() {
   const [simSummary, setSimSummary] = useState<SimSummary>({ total: 0, inUse: 0, free: 0 });
   const [filterAgent, setFilterAgent] = useState('');
   const [sortMode, setSortMode] = useState<SimSortMode>('ascending');
+  const [dataLoading, setDataLoading] = useState(true);
+  const [dataReady, setDataReady] = useState(false);
 
   const load = useCallback(async () => {
-    const [agentsData, simsData, summary] = await Promise.all([
-      apiFetch<Agent[]>('/api/agents'),
-      apiFetch<Sim[]>('/api/sims'),
-      apiFetch<SimSummary>('/api/summary?type=sims'),
-    ]);
-    setAgents(agentsData);
-    setSims(simsData);
-    setSimSummary(summary);
+    setDataLoading(true);
+    try {
+      const [agentsData, simsData, summary] = await Promise.all([
+        apiFetch<Agent[]>('/api/agents'),
+        apiFetch<Sim[]>('/api/sims'),
+        apiFetch<SimSummary>('/api/summary?type=sims'),
+      ]);
+      setAgents(agentsData);
+      setSims(simsData);
+      setSimSummary(summary);
+      setDataReady(true);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDataLoading(false);
+    }
   }, []);
 
   useEffect(() => { if (!loading) load().catch(console.error); }, [loading, load]);
+
+  useEffect(() => {
+    const onGameChange = () => { load().catch(console.error); };
+    window.addEventListener('rm-game-change', onGameChange);
+    return () => window.removeEventListener('rm-game-change', onGameChange);
+  }, [load]);
 
   const filtered = useMemo(() => {
     let list = sims;
@@ -90,7 +107,14 @@ export default function AvailablePage() {
 
   const sortLabel = sortMode === 'grouped' ? 'by group, then ascending' : 'session ID ascending';
 
-  if (loading) return <div className="loading-screen">Loading…</div>;
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner" aria-hidden="true" />
+        <span>Loading…</span>
+      </div>
+    );
+  }
 
   return (
     <PhoneRevealProvider>
@@ -109,7 +133,11 @@ export default function AvailablePage() {
           </div>
         }
       >
-        <div className="card-stack">
+        <div className={`card-stack${dataLoading && dataReady ? ' content-refreshing' : ''}`}>
+          {!dataReady && dataLoading ? (
+            <div className="card"><LoadingBlock label="Loading available SIMs…" /></div>
+          ) : (
+          <>
           <div className="card">
             <div className="two-col form-grid">
               <div className="field" style={{ margin: 0 }}>
@@ -144,6 +172,8 @@ export default function AvailablePage() {
             </div>
             <SimTable sims={waitingSims} emptyMessage="No SIM cards on cooldown" />
           </div>
+          </>
+          )}
         </div>
       </AppShell>
     </PhoneRevealProvider>
