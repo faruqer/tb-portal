@@ -23,20 +23,22 @@ function gameNextOverride(
   return null;
 }
 
+export function nextOverrideField(gameType: GameKey): 'nextPlaying35kAtOverride' | 'nextPlaying20kAtOverride' {
+  return gameType === '35k' ? 'nextPlaying35kAtOverride' : 'nextPlaying20kAtOverride';
+}
+
 function simOverrides(
   obj: {
-    lastPlayedAtOverride?: Date | null;
     nextPlaying35kAtOverride?: Date | null;
     nextPlaying20kAtOverride?: Date | null;
     nextPlayingAtOverride?: Date | null;
   },
   gameType: GameKey
 ) {
-  const overrides: { lastPlayedAt?: Date; nextPlayingAt?: Date } = {};
-  if (obj.lastPlayedAtOverride) overrides.lastPlayedAt = new Date(obj.lastPlayedAtOverride);
+  const overrides: { nextPlayingAt?: Date } = {};
   const next = gameNextOverride(obj, gameType);
   if (next) overrides.nextPlayingAt = next;
-  return overrides.lastPlayedAt || overrides.nextPlayingAt ? overrides : undefined;
+  return overrides.nextPlayingAt ? overrides : undefined;
 }
 
 export function enrichSimWithDates(
@@ -76,7 +78,16 @@ export async function setSimLastPlayed(
   playedAt: Date
 ) {
   const { SimCard } = await getModels();
-  await SimCard.findOneAndUpdate({ agentId, sessionId }, { [lastPlayedField(gameType)]: playedAt });
+  await SimCard.findOneAndUpdate(
+    { agentId, sessionId },
+    {
+      [lastPlayedField(gameType)]: playedAt,
+      [nextOverrideField(gameType)]: null,
+      // Legacy global overrides shadow per-game last-played fields — clear on play.
+      lastPlayedAtOverride: null,
+      nextPlayingAtOverride: null,
+    }
+  );
 }
 
 export async function refreshSimLastPlayed(agentId: string, sessionId: number, gameType: GameKey) {
@@ -91,7 +102,14 @@ export async function refreshSimLastPlayed(agentId: string, sessionId: number, g
       : new Date(`${latest.date}T00:00:00`)
     : null;
 
-  await SimCard.findOneAndUpdate({ agentId, sessionId }, { [lastPlayedField(gameType)]: playedAt });
+  await SimCard.findOneAndUpdate(
+    { agentId, sessionId },
+    {
+      [lastPlayedField(gameType)]: playedAt,
+      lastPlayedAtOverride: null,
+      nextPlayingAtOverride: null,
+    }
+  );
 }
 
 export async function getNextSessionId(agentId: string): Promise<number> {

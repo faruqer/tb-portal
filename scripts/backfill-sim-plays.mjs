@@ -72,7 +72,14 @@ async function main() {
     if (last35 || last20) {
       await SimCard.updateOne(
         { _id: sim._id },
-        { $set: { lastPlayed35kAt: last35, lastPlayed20kAt: last20 } }
+        {
+          $set: {
+            lastPlayed35kAt: last35,
+            lastPlayed20kAt: last20,
+            lastPlayedAtOverride: null,
+            nextPlayingAtOverride: null,
+          },
+        }
       );
       updated++;
     }
