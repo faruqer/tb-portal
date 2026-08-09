@@ -13,6 +13,7 @@ export const SimCardSchema = new Schema(
     nextPlayingAtOverride: { type: Date, default: null },
     nextPlaying35kAtOverride: { type: Date, default: null },
     nextPlaying20kAtOverride: { type: Date, default: null },
+    sessionToken: { type: String, default: null },
   },
   { timestamps: true }
 );

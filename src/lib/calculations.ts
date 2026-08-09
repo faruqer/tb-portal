@@ -3,11 +3,11 @@ export function roundAmount(value: number): number {
 }
 
 export function calcNetProfit(wonProfit: number): number {
-  return roundAmount(wonProfit * 0.75);
+  return (Number(wonProfit) || 0) * 0.75;
 }
 
 export function calcExpectedToReceive(netProfit: number): number {
-  return roundAmount(netProfit * 0.5);
+  return (Number(netProfit) || 0) * 0.5;
 }
 
 export function parseSessionId(value: string | number): number {
@@ -22,9 +22,25 @@ export function money(value: number): string {
   });
 }
 
-/** For number inputs — no decimal display */
+/** Exact amount for display — keeps decimals (e.g. 750.75). */
+export function moneyExact(value: number): string {
+  const n = Number(value) || 0;
+  return String(Math.round(n * 100) / 100);
+}
+
+/** Integer only — for clipboard copy. */
+export function copyAmount(value: number): string {
+  return String(Math.trunc(Number(value) || 0));
+}
+
+/** Plain integer string — no commas, no decimal part. */
+export function moneyPlain(value: number): string {
+  return String(Math.trunc(Number(value) || 0));
+}
+
+/** For number inputs — preserves decimals when present. */
 export function amountInput(value: number): string {
-  return String(roundAmount(value));
+  return moneyExact(value);
 }
 
 export const NEXT_PLAY_DELAY_DAYS = 7;
@@ -32,7 +48,7 @@ export const NEXT_PLAY_DELAY_DAYS = 7;
 export function addDaysStr(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return localDateStr(d);
 }
 
 export function addDaysToDate(date: Date, days: number): Date {
@@ -66,6 +82,14 @@ export function localDateStr(d: Date): string {
 
 export function todayLocalStr(): string {
   return localDateStr(new Date());
+}
+
+/** Monday of the week containing `d`, as YYYY-MM-DD in local time. */
+export function getWeekStartStr(d = new Date()): string {
+  const copy = new Date(d);
+  const day = copy.getDay();
+  copy.setDate(copy.getDate() + (day === 0 ? -6 : 1 - day));
+  return localDateStr(copy);
 }
 
 /** Not available yet, but cooldown ends later today (local time). */

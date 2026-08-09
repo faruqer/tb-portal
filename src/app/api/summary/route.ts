@@ -3,18 +3,10 @@ import { getModels } from '@/lib/mongodb';
 import { getSession } from '@/lib/auth';
 import { jsonOk, requireAuth } from '@/lib/api-utils';
 import type { GameTotals } from '@/lib/types';
-import { addDaysStr } from '@/lib/calculations';
+import { addDaysStr, getWeekStartStr, localDateStr } from '@/lib/calculations';
 import { resolveAgentId, emptyTotals, addToTotals } from '@/lib/game-utils';
 import { withGame, gameFromParam, currentGameType } from '@/lib/game-filter';
 import { enrichSimWithDates } from '@/lib/sim-service';
-
-function getWeekStart(d: Date): string {
-  const copy = new Date(d);
-  const day = copy.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  copy.setDate(copy.getDate() + diff);
-  return copy.toISOString().slice(0, 10);
-}
 
 function sumGames(
   games: { wonProfit?: number; netProfit?: number; expectedToReceive?: number; received?: number }[]
@@ -27,7 +19,7 @@ function sumGames(
 
 function bucketKey(dateStr: string, period: 'day' | 'week' | 'month'): string {
   if (period === 'month') return dateStr.slice(0, 7);
-  if (period === 'week') return getWeekStart(new Date(dateStr + 'T00:00:00'));
+  if (period === 'week') return getWeekStartStr(new Date(dateStr + 'T00:00:00'));
   return dateStr.slice(0, 10);
 }
 
@@ -39,13 +31,13 @@ function buildChartLabels(period: 'day' | 'week' | 'month'): string[] {
     for (let i = 13; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
-      labels.push(d.toISOString().slice(0, 10));
+      labels.push(localDateStr(d));
     }
   } else if (period === 'week') {
     for (let i = 7; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i * 7);
-      labels.push(getWeekStart(d));
+      labels.push(getWeekStartStr(d));
     }
   } else {
     for (let i = 11; i >= 0; i--) {
@@ -160,7 +152,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (type === 'weekly') {
-    const weekStart = searchParams.get('weekStart') || getWeekStart(new Date());
+    const weekStart = searchParams.get('weekStart') || getWeekStartStr(new Date());
     const weekEnd = addDaysStr(weekStart, 6);
     const weekGames = games.filter((g) => g.date >= weekStart && g.date <= weekEnd);
     const byDay: Record<string, GameTotals> = {};

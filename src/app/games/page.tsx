@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { adminLinks } from '@/components/NavBar';
 import { Modal } from '@/components/Modal';
 import { LoadingBlock } from '@/components/LoadingBlock';
 import { useSession, apiFetch } from '@/lib/hooks';
-import { calcExpectedToReceive, calcNetProfit, money, amountInput } from '@/lib/calculations';
+import { calcExpectedToReceive, calcNetProfit, copyAmount, moneyExact, amountInput } from '@/lib/calculations';
+import { blurOnEnter } from '@/lib/inline-edit';
 
 interface Agent {
   id: string;
@@ -25,26 +26,6 @@ interface Game {
   paymentStatus: string;
 }
 
-function enterOrBlur(
-  e: React.KeyboardEvent<HTMLInputElement>,
-  commit: () => void,
-  skipBlurRef: React.MutableRefObject<boolean>
-) {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    skipBlurRef.current = true;
-    commit();
-  }
-}
-
-function blurCommit(commit: () => void, skipBlurRef: React.MutableRefObject<boolean>) {
-  if (skipBlurRef.current) {
-    skipBlurRef.current = false;
-    return;
-  }
-  commit();
-}
-
 function GameRow({
   game,
   onUpdate,
@@ -58,7 +39,6 @@ function GameRow({
   onMarkPaid: (id: string) => Promise<void>;
   markingPaid: boolean;
 }) {
-  const skipBlur = useRef(false);
   const [won, setWon] = useState(amountInput(game.wonProfit));
   const [expected, setExpected] = useState(amountInput(game.expectedToReceive));
   const [date, setDate] = useState(game.date);
@@ -104,8 +84,8 @@ function GameRow({
           className="inline-input"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          onKeyDown={(e) => enterOrBlur(e, commitDate, skipBlur)}
-          onBlur={() => blurCommit(commitDate, skipBlur)}
+          onKeyDown={blurOnEnter}
+          onBlur={() => { commitDate(); }}
         />
       </td>
       <td>
@@ -114,19 +94,19 @@ function GameRow({
           className="inline-input"
           value={won}
           onChange={(e) => setWon(e.target.value)}
-          onKeyDown={(e) => enterOrBlur(e, commitWon, skipBlur)}
-          onBlur={() => blurCommit(commitWon, skipBlur)}
+          onKeyDown={blurOnEnter}
+          onBlur={() => { commitWon(); }}
         />
       </td>
-      <td>{money(net)}</td>
+      <td>{moneyExact(net)}</td>
       <td>
         <input
           type="number"
           className="inline-input"
           value={expected}
           onChange={(e) => setExpected(e.target.value)}
-          onKeyDown={(e) => enterOrBlur(e, commitExpected, skipBlur)}
-          onBlur={() => blurCommit(commitExpected, skipBlur)}
+          onKeyDown={blurOnEnter}
+          onBlur={() => { commitExpected(); }}
         />
       </td>
       <td className="row-actions">
@@ -281,7 +261,7 @@ export default function AdminGamesPage() {
   async function copySelected() {
     const lines = copyGames
       .filter((g) => selectedCopy.has(g.id))
-      .map((g) => `${g.sessionId ?? g.gameName} - ${g.netProfit}`);
+      .map((g) => `${g.sessionId ?? g.gameName} - ${copyAmount(calcNetProfit(g.wonProfit))}`);
     const text = lines.join('\n');
     await navigator.clipboard.writeText(text);
     setCopyMsg(`Copied ${lines.length} line(s)`);
@@ -337,7 +317,7 @@ export default function AdminGamesPage() {
             </span>
             <span className="games-today-stats-sep">·</span>
             <span>
-              Expected: <strong>{todayStats.expectedToday.toFixed(1)}</strong>
+              Expected: <strong>{Math.trunc(todayStats.expectedToday)}</strong>
               <span className="games-today-stats-hint"> ({todayStats.totalSims} SIMs ÷ 7)</span>
             </span>
           </div>
@@ -472,11 +452,11 @@ export default function AdminGamesPage() {
           <div className="two-col form-grid">
             <div className="field">
               <label className="label">Net (75%) — auto</label>
-              <input readOnly value={money(net)} />
+              <input readOnly value={moneyExact(net)} />
             </div>
             <div className="field">
               <label className="label">Expected (50%) — auto</label>
-              <input readOnly value={money(expected)} />
+              <input readOnly value={moneyExact(expected)} />
             </div>
           </div>
         </form>
@@ -509,7 +489,7 @@ export default function AdminGamesPage() {
                 />
                 <span>
                   <strong>{g.gameName}</strong>
-                  <span className="copy-meta"> — Net {money(g.netProfit)} · {g.date}</span>
+                  <span className="copy-meta"> — Net {moneyExact(calcNetProfit(g.wonProfit))} · {g.date}</span>
                 </span>
               </label>
             ))}

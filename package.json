@@ -13,7 +13,8 @@
     "merge-db": "node scripts/merge-databases.mjs",
     "unify-shared": "node scripts/unify-shared.mjs",
     "backfill-sim-plays": "node scripts/backfill-sim-plays.mjs",
-    "reset-passwords": "node scripts/reset-agent-passwords.mjs"
+    "reset-passwords": "node scripts/reset-agent-passwords.mjs",
+    "import-sessions": "node scripts/import-sessions.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

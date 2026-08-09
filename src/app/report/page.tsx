@@ -9,7 +9,7 @@ import { ReportChart, type ChartData, type MetricKey } from '@/components/Report
 import { ReportGameFilter } from '@/components/ReportGameFilter';
 import { LoadingBlock } from '@/components/LoadingBlock';
 import { useSession, apiFetch } from '@/lib/hooks';
-import { money } from '@/lib/calculations';
+import { money, addDaysStr, getWeekStartStr } from '@/lib/calculations';
 import { gameBadgeClass, gameRowClass, gameTypeLabel } from '@/lib/game-styles';
 import type { GameFilter } from '@/lib/game-filter';
 import type { GameTotals } from '@/lib/types';
@@ -23,13 +23,6 @@ interface Game {
 }
 
 interface AgentSummary { agentId: string; agentName: string; totals: GameTotals; }
-
-function getWeekStart(d = new Date()): string {
-  const copy = new Date(d);
-  const day = copy.getDay();
-  copy.setDate(copy.getDate() + (day === 0 ? -6 : 1 - day));
-  return copy.toISOString().slice(0, 10);
-}
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const VIEWS = ['general', 'weekly', 'history', 'calendar', 'chart'] as const;
@@ -46,7 +39,7 @@ export default function ReportPage() {
   const [filterDate, setFilterDate] = useState('');
   const [view, setView] = useState<View>('general');
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [weekStart, setWeekStart] = useState(getWeekStart());
+  const [weekStart, setWeekStart] = useState(getWeekStartStr());
   const [monthData, setMonthData] = useState<{ byDay: Record<string, GameTotals>; totals: GameTotals } | null>(null);
   const [monthLoading, setMonthLoading] = useState(false);
   const [weekData, setWeekData] = useState<{ byDay: Record<string, GameTotals>; totals: GameTotals; weekStart: string; weekEnd: string } | null>(null);
@@ -216,9 +209,7 @@ export default function ReportPage() {
     if (!weekData) return null;
     const days: React.ReactNode[] = [];
     for (let i = 0; i < 7; i++) {
-      const d = new Date(weekData.weekStart + 'T00:00:00');
-      d.setDate(d.getDate() + i);
-      const dateStr = d.toISOString().slice(0, 10);
+      const dateStr = addDaysStr(weekData.weekStart, i);
       const data = weekData.byDay[dateStr];
       days.push(
         <div key={dateStr} className={`week-day-card ${data ? 'has-data' : ''}`}>
@@ -298,7 +289,7 @@ export default function ReportPage() {
           <div className="card">
             <div className="card-header">
               <h3>Week of {weekStart}</h3>
-              <input type="date" value={weekStart} onChange={(e) => setWeekStart(getWeekStart(new Date(e.target.value + 'T00:00:00')))} style={{ width: 'auto' }} />
+              <input type="date" value={weekStart} onChange={(e) => setWeekStart(getWeekStartStr(new Date(e.target.value + 'T00:00:00')))} style={{ width: 'auto' }} />
             </div>
             {weekData && <SummaryGrid totals={weekData.totals} label={`${weekData.weekStart} → ${weekData.weekEnd}`} />}
             <div className="week-bar" style={{ marginTop: '1.25rem' }}>{renderWeekBar()}</div>
