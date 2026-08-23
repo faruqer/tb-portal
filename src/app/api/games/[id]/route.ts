@@ -28,6 +28,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   if (body.action === 'mark_paid') {
     game.paymentStatus = 'paid';
+    game.paidAt = new Date();
     game.received = roundAmount(Number(body.received ?? game.expectedToReceive));
     game.completed = 'completed';
     game.compite = 'completed';
@@ -38,6 +39,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   if (body.action === 'mark_unpaid') {
     game.paymentStatus = 'unpaid';
+    game.paidAt = null;
     game.received = 0;
     game.completed = 'pending';
     game.compite = 'pending';

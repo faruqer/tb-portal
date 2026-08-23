@@ -7,6 +7,7 @@ import { addDaysStr, getWeekStartStr, localDateStr } from '@/lib/calculations';
 import { resolveAgentId, emptyTotals, addToTotals } from '@/lib/game-utils';
 import { withGame, gameFromParam, currentGameType } from '@/lib/game-filter';
 import { enrichSimWithDates } from '@/lib/sim-service';
+import { buildDateRangeMongo } from '@/lib/date-range';
 
 function sumGames(
   games: { wonProfit?: number; netProfit?: number; expectedToReceive?: number; received?: number }[]
@@ -66,6 +67,8 @@ export async function GET(req: NextRequest) {
   const { Game, SimCard, Agent } = await getModels();
   const { searchParams } = new URL(req.url);
   const date = searchParams.get('date');
+  const from = searchParams.get('from');
+  const to = searchParams.get('to');
   const agentId = searchParams.get('agentId');
   const type = searchParams.get('type') || 'general';
   const gameParam = searchParams.get('game');
@@ -78,7 +81,8 @@ export async function GET(req: NextRequest) {
   } else if (agentId) {
     filter.agentId = agentId;
   }
-  if (date) filter.date = date;
+  const dateFilter = buildDateRangeMongo(from, to, date);
+  if (dateFilter) Object.assign(filter, dateFilter);
 
   const games = await Game.find(await withGame(filter, gameKey)).populate('agentId', 'name');
   const totals = sumGames(games);

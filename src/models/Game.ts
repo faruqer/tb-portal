@@ -20,6 +20,7 @@ export const GameSchema = new Schema(
       enum: ['unpaid', 'paid'],
       default: 'unpaid',
     },
+    paidAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

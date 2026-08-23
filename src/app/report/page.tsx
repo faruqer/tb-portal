@@ -9,7 +9,8 @@ import { ReportChart, type ChartData, type MetricKey } from '@/components/Report
 import { ReportGameFilter } from '@/components/ReportGameFilter';
 import { LoadingBlock } from '@/components/LoadingBlock';
 import { useSession, apiFetch } from '@/lib/hooks';
-import { money, addDaysStr, getWeekStartStr } from '@/lib/calculations';
+import { money, addDaysStr, getWeekStartStr, formatDateTime } from '@/lib/calculations';
+import { appendDateRangeParams, dateRangeLabel, dateRangeQuery, hasDateRange } from '@/lib/date-range';
 import { gameBadgeClass, gameRowClass, gameTypeLabel } from '@/lib/game-styles';
 import type { GameFilter } from '@/lib/game-filter';
 import type { GameTotals } from '@/lib/types';
@@ -20,11 +21,12 @@ interface Game {
   id: string; gameName: string; agentId: string; agentName?: string;
   wonProfit: number; netProfit: number; expectedToReceive: number; received: number;
   date: string; paymentStatus: string; gameType?: string;
+  paidAt?: string | null; updatedAt?: string;
 }
 
 interface AgentSummary { agentId: string; agentName: string; totals: GameTotals; }
 
-const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const WEEKDAYS = ['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'];
 const VIEWS = ['general', 'weekly', 'history', 'calendar', 'chart'] as const;
 type View = typeof VIEWS[number];
 
@@ -36,7 +38,10 @@ export default function ReportPage() {
   const [historyReady, setHistoryReady] = useState(false);
   const [unpayingId, setUnpayingId] = useState<string | null>(null);
   const [filterAgent, setFilterAgent] = useState('');
-  const [filterDate, setFilterDate] = useState('');
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
+  const [generalFrom, setGeneralFrom] = useState('');
+  const [generalTo, setGeneralTo] = useState('');
   const [view, setView] = useState<View>('general');
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
   const [weekStart, setWeekStart] = useState(getWeekStartStr());
@@ -63,7 +68,9 @@ export default function ReportPage() {
     try {
       const [agentsData, byAgent] = await Promise.all([
         apiFetch<Agent[]>('/api/agents'),
-        apiFetch<AgentSummary[]>(gq('/api/summary?type=by-agent')),
+        apiFetch<AgentSummary[]>(
+          gq(`/api/summary?type=by-agent${dateRangeQuery(generalFrom, generalTo)}`)
+        ),
       ]);
       setAgents(agentsData);
       setAgentSummaries(byAgent);
@@ -73,13 +80,18 @@ export default function ReportPage() {
     } finally {
       setDataLoading(false);
     }
-  }, [gq]);
+  }, [gq, generalFrom, generalTo]);
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
-      const gameParam = reportGame === 'all' ? 'all' : reportGame;
-      const data = await apiFetch<Game[]>(`/api/games?paymentStatus=paid&game=${gameParam}`);
+      const params = new URLSearchParams({
+        paymentStatus: 'paid',
+        game: reportGame === 'all' ? 'all' : reportGame,
+      });
+      if (filterAgent) params.set('agentId', filterAgent);
+      appendDateRangeParams(params, filterFrom, filterTo);
+      const data = await apiFetch<Game[]>(`/api/games?${params}`);
       setHistoryGames(data);
       setHistoryReady(true);
     } catch (err) {
@@ -87,7 +99,7 @@ export default function ReportPage() {
     } finally {
       setHistoryLoading(false);
     }
-  }, [reportGame]);
+  }, [reportGame, filterAgent, filterFrom, filterTo]);
 
   useEffect(() => { if (!loading) load().catch(console.error); }, [loading, load]);
 
@@ -130,11 +142,7 @@ export default function ReportPage() {
     }
   }, [view, chartPeriod, loading, gq]);
 
-  const filteredHistory = useMemo(() => historyGames.filter((g) => {
-    if (filterAgent && g.agentId !== filterAgent) return false;
-    if (filterDate && g.date !== filterDate) return false;
-    return true;
-  }), [historyGames, filterAgent, filterDate]);
+  const filteredHistory = historyGames;
 
   const totals = useMemo(() => {
     if (view === 'general') {
@@ -256,7 +264,40 @@ export default function ReportPage() {
           <div className="card"><LoadingBlock label="Loading report…" /></div>
         ) : (
         <div className={`card-stack${dataLoading && dataReady ? ' content-refreshing' : ''}`}>
-          <div className="card"><SummaryGrid totals={totals} label="All-time totals" /></div>
+          <div className="card">
+            <div className="card-header">
+              <h3>{hasDateRange(generalFrom, generalTo) ? dateRangeLabel(generalFrom, generalTo, 'All-time report') : 'All-time report'}</h3>
+              <div className="page-actions">
+                <label className="label" style={{ margin: 0 }}>From</label>
+                <input
+                  type="date"
+                  value={generalFrom}
+                  onChange={(e) => setGeneralFrom(e.target.value)}
+                  style={{ width: 'auto' }}
+                />
+                <label className="label" style={{ margin: 0 }}>To</label>
+                <input
+                  type="date"
+                  value={generalTo}
+                  onChange={(e) => setGeneralTo(e.target.value)}
+                  style={{ width: 'auto' }}
+                />
+                {hasDateRange(generalFrom, generalTo) && (
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    onClick={() => { setGeneralFrom(''); setGeneralTo(''); }}
+                  >
+                    All time
+                  </button>
+                )}
+              </div>
+            </div>
+            <SummaryGrid
+              totals={totals}
+              label={hasDateRange(generalFrom, generalTo) ? dateRangeLabel(generalFrom, generalTo) : 'All-time totals'}
+            />
+          </div>
           <div className="card">
             <div className="card-header"><h3>Per Agent</h3></div>
             <div className="table-wrap">
@@ -329,7 +370,7 @@ export default function ReportPage() {
       {view === 'history' && (
         <div className="card-stack">
           <div className="card">
-            <div className="two-col form-grid">
+            <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(10rem, 1fr))' }}>
               <div className="field" style={{ margin: 0 }}>
                 <label className="label">Agent</label>
                 <select value={filterAgent} onChange={(e) => setFilterAgent(e.target.value)}>
@@ -338,8 +379,23 @@ export default function ReportPage() {
                 </select>
               </div>
               <div className="field" style={{ margin: 0 }}>
-                <label className="label">Date</label>
-                <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} />
+                <label className="label">From</label>
+                <input type="date" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} />
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label className="label">To</label>
+                <div className="page-actions" style={{ margin: 0 }}>
+                  <input type="date" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
+                  {hasDateRange(filterFrom, filterTo) && (
+                    <button
+                      type="button"
+                      className="btn-secondary btn-sm"
+                      onClick={() => { setFilterFrom(''); setFilterTo(''); }}
+                    >
+                      All dates
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -350,16 +406,17 @@ export default function ReportPage() {
             </div>
             <div className="table-wrap">
               <table className="data-table">
-                <thead><tr><th>Date</th><th>Game</th><th>Agent</th><th>Session</th><th>Won</th><th>Net</th><th>Expected</th><th>Received</th><th></th></tr></thead>
+                <thead><tr><th>Game date</th><th>Paid at</th><th>Game</th><th>Agent</th><th>Session</th><th>Won</th><th>Net</th><th>Expected</th><th>Received</th><th></th></tr></thead>
                 <tbody>
                   {historyLoading || !historyReady ? (
-                    <tr><td colSpan={9}><LoadingBlock label="Loading paid history…" compact /></td></tr>
+                    <tr><td colSpan={10}><LoadingBlock label="Loading paid history…" compact /></td></tr>
                   ) : filteredHistory.length === 0 ? (
-                    <tr><td colSpan={9} className="empty-state">No paid games found</td></tr>
+                    <tr><td colSpan={10} className="empty-state">No paid games found</td></tr>
                   ) : (
                     filteredHistory.map((g) => (
                       <tr key={g.id} className={gameRowClass(g.gameType)}>
                         <td>{g.date}</td>
+                        <td>{formatDateTime(g.paidAt ?? g.updatedAt)}</td>
                         <td><span className={`badge ${gameBadgeClass(g.gameType)}`}>{gameTypeLabel(g.gameType)}</span></td>
                         <td>{g.agentName || g.agentId}</td>
                         <td>{g.gameName}</td>

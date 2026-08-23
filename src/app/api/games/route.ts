@@ -5,6 +5,7 @@ import { calcNetProfit, calcExpectedToReceive, parseSessionId, roundAmount } fro
 import { withGame, gameScope, gameFromParam, currentGameType } from '@/lib/game-filter';
 import { jsonOk, jsonError, requireAdmin, serializeDoc } from '@/lib/api-utils';
 import { getAgentSessionIds, getAvailableSims, setSimLastPlayed } from '@/lib/sim-service';
+import { buildDateRangeMongo } from '@/lib/date-range';
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -15,6 +16,9 @@ export async function GET(req: NextRequest) {
   const completed = searchParams.get('completed');
   const agentFilter = searchParams.get('agentId');
   const paymentStatus = searchParams.get('paymentStatus');
+  const date = searchParams.get('date');
+  const from = searchParams.get('from');
+  const to = searchParams.get('to');
   const gameParam = searchParams.get('game');
   const gameKey =
     gameParam === 'all'
@@ -32,6 +36,8 @@ export async function GET(req: NextRequest) {
   if (paymentStatus === 'paid' || paymentStatus === 'unpaid') {
     filter.paymentStatus = paymentStatus;
   }
+  const dateFilter = buildDateRangeMongo(from, to, date);
+  if (dateFilter) Object.assign(filter, dateFilter);
 
   const games = await Game.find(await withGame(filter, gameKey))
     .populate('agentId', 'name')

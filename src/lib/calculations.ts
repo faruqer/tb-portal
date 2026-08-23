@@ -84,11 +84,11 @@ export function todayLocalStr(): string {
   return localDateStr(new Date());
 }
 
-/** Monday of the week containing `d`, as YYYY-MM-DD in local time. */
+/** Friday of the week containing `d`, as YYYY-MM-DD in local time. */
 export function getWeekStartStr(d = new Date()): string {
   const copy = new Date(d);
   const day = copy.getDay();
-  copy.setDate(copy.getDate() + (day === 0 ? -6 : 1 - day));
+  copy.setDate(copy.getDate() - ((day + 7 - 5) % 7));
   return localDateStr(copy);
 }
 
