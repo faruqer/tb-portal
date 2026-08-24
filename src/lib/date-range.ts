@@ -1,8 +1,12 @@
+type DateRangeFilter = {
+  date: string | { $gte?: string; $lte?: string };
+};
+
 export function buildDateRangeMongo(
   from: string | null | undefined,
   to: string | null | undefined,
   singleDate?: string | null
-): { date: string | { $gte: string; $lte: string } } | undefined {
+): DateRangeFilter | undefined {
   if (singleDate) return { date: singleDate };
 
   const f = from?.trim() || '';
