@@ -12,6 +12,7 @@ import { blurOnEnter } from '@/lib/inline-edit';
 interface Agent {
   id: string;
   name: string;
+  deletedAt?: string | null;
 }
 
 interface Game {
@@ -153,7 +154,7 @@ export default function AdminGamesPage() {
     setDataLoading(true);
     try {
       const [agentsData, gamesData, todayData] = await Promise.all([
-        apiFetch<Agent[]>('/api/agents'),
+        apiFetch<Agent[]>('/api/agents?includeDeleted=true'),
         apiFetch<Game[]>('/api/games?completed=false'),
         apiFetch<{ wonToday: number; expectedToday: number; totalSims: number }>(
           '/api/summary?type=today-progress'
@@ -339,7 +340,7 @@ export default function AdminGamesPage() {
             return (
               <div key={agent.id} className="card">
                 <div className="card-header">
-                  <h3>{agent.name}</h3>
+                  <h3>{agent.name}{agent.deletedAt && ' (deleted)'}</h3>
                   <div className="card-header-actions">
                     <span className="badge badge-muted">{agentGames.length} active</span>
                     <button
@@ -404,7 +405,7 @@ export default function AdminGamesPage() {
               required
             >
               <option value="">Select agent…</option>
-              {agents.map((a) => (
+              {agents.filter((a) => !a.deletedAt).map((a) => (
                 <option key={a.id} value={a.id}>{a.name}</option>
               ))}
             </select>

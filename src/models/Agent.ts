@@ -6,6 +6,7 @@ export const AgentSchema = new Schema(
     name: { type: String, required: true, trim: true },
     username: { type: String, required: true, unique: true, trim: true, lowercase: true },
     passwordHash: { type: String, required: true },
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

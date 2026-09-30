@@ -3,13 +3,14 @@ import { getModels } from '@/lib/mongodb';
 import { getSession, hashPassword } from '@/lib/auth';
 import { jsonOk, jsonError, requireAdmin, serializeDoc } from '@/lib/api-utils';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await getSession();
   const denied = requireAdmin(session);
   if (denied) return denied;
 
+  const includeDeleted = new URL(req.url).searchParams.get('includeDeleted') === 'true';
   const { Agent } = await getModels();
-  const agents = await Agent.find().sort({ name: 1 });
+  const agents = await Agent.find(includeDeleted ? {} : { deletedAt: null }).sort({ name: 1 });
   return jsonOk(agents.map((a) => ({ ...serializeDoc(a.toObject()), passwordHash: undefined })));
 }
 
@@ -28,7 +29,9 @@ export async function POST(req: NextRequest) {
   const { Agent } = await getModels();
   const normalized = String(username).toLowerCase().trim();
   const existing = await Agent.findOne({ username: normalized });
-  if (existing) return jsonError('Username already exists');
+  if (existing) {
+    return jsonError(existing.deletedAt ? 'Username belongs to a deleted agent' : 'Username already exists');
+  }
 
   const agent = await Agent.create({
     name: String(name).trim(),

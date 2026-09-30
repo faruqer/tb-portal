@@ -15,7 +15,7 @@ import { gameBadgeClass, gameRowClass, gameTypeLabel } from '@/lib/game-styles';
 import type { GameFilter } from '@/lib/game-filter';
 import type { GameTotals } from '@/lib/types';
 
-interface Agent { id: string; name: string; }
+interface Agent { id: string; name: string; deletedAt?: string | null; }
 
 interface Game {
   id: string; gameName: string; agentId: string; agentName?: string;
@@ -67,7 +67,7 @@ export default function ReportPage() {
     setDataLoading(true);
     try {
       const [agentsData, byAgent] = await Promise.all([
-        apiFetch<Agent[]>('/api/agents'),
+        apiFetch<Agent[]>('/api/agents?includeDeleted=true'),
         apiFetch<AgentSummary[]>(
           gq(`/api/summary?type=by-agent${dateRangeQuery(generalFrom, generalTo)}`)
         ),
@@ -375,7 +375,7 @@ export default function ReportPage() {
                 <label className="label">Agent</label>
                 <select value={filterAgent} onChange={(e) => setFilterAgent(e.target.value)}>
                   <option value="">All</option>
-                  {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  {agents.map((a) => <option key={a.id} value={a.id}>{a.name}{a.deletedAt ? ' (deleted)' : ''}</option>)}
                 </select>
               </div>
               <div className="field" style={{ margin: 0 }}>

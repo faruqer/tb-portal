@@ -118,11 +118,24 @@ export async function getNextSessionId(agentId: string): Promise<number> {
   return latest ? latest.sessionId + 1 : 1;
 }
 
+/** IDs of soft-deleted agents; their SIMs are kept for history but hidden from active use. */
+export async function getDeletedAgentIds() {
+  const { Agent } = await getModels();
+  const agents = await Agent.find({ deletedAt: { $ne: null } }).select('_id');
+  return agents.map((a) => a._id);
+}
+
+/** Mongo filter on SimCard.agentId that excludes SIMs belonging to deleted agents. */
+export async function activeAgentSimFilter(): Promise<Record<string, unknown>> {
+  return { agentId: { $nin: await getDeletedAgentIds() } };
+}
+
 export async function getAvailableSims(agentId?: string, gameType?: GameKey) {
   const gt = gameType ?? (await currentGameType());
   const { SimCard } = await getModels();
-  const filter: Record<string, unknown> = {};
-  if (agentId) filter.agentId = agentId;
+  const deletedIds = await getDeletedAgentIds();
+  if (agentId && deletedIds.some((id) => id.toString() === agentId)) return [];
+  const filter: Record<string, unknown> = { agentId: agentId || { $nin: deletedIds } };
 
   const sims = await SimCard.find(filter).populate('agentId', 'name').sort({ sessionId: 1 });
 

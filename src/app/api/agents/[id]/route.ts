@@ -33,7 +33,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (body.username) {
     const username = String(body.username).toLowerCase().trim();
     const existing = await Agent.findOne({ username, _id: { $ne: id } });
-    if (existing) return jsonError('Username already exists');
+    if (existing) {
+      return jsonError(existing.deletedAt ? 'Username belongs to a deleted agent' : 'Username already exists');
+    }
     agent.username = username;
   }
   if (body.password) {
@@ -49,12 +51,14 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const denied = requireAdmin(session);
   if (denied) return denied;
 
+  // Soft delete: keep the agent's games and SIMs so history and reports stay intact.
   const { id } = await params;
-  const { Agent, SimCard, Game } = await getModels();
-  await Promise.all([
-    Agent.findByIdAndDelete(id),
-    SimCard.deleteMany({ agentId: id }),
-    Game.deleteMany({ agentId: id }),
-  ]);
+  const { Agent } = await getModels();
+  const agent = await Agent.findById(id);
+  if (!agent) return jsonError('Agent not found', 404);
+  if (!agent.deletedAt) {
+    agent.deletedAt = new Date();
+    await agent.save();
+  }
   return jsonOk({ ok: true });
 }

@@ -15,6 +15,7 @@ function getSecret() {
 export function agentLoginFilter(login: string) {
   const normalized = login.toLowerCase().trim();
   return {
+    deletedAt: null,
     $or: [
       { username: normalized },
       { name: { $regex: new RegExp(`^${normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },

@@ -4,7 +4,13 @@ import { getSession } from '@/lib/auth';
 import { parseSessionId, normalizeGroupId } from '@/lib/calculations';
 import { currentGameType } from '@/lib/game-filter';
 import { jsonOk, jsonError, requireAdmin, serializeDoc } from '@/lib/api-utils';
-import { enrichSimWithDates, enrichSimBothGames, getAvailableSims, getNextSessionId } from '@/lib/sim-service';
+import {
+  activeAgentSimFilter,
+  enrichSimWithDates,
+  enrichSimBothGames,
+  getAvailableSims,
+  getNextSessionId,
+} from '@/lib/sim-service';
 
 function mapSimResponse(
   obj: Record<string, unknown>,
@@ -66,11 +72,13 @@ export async function GET(req: NextRequest) {
   }
 
   const { SimCard } = await getModels();
-  const filter: Record<string, unknown> = {};
+  let filter: Record<string, unknown> = {};
   if (session.role === 'agent') {
     filter.agentId = session.agentId;
   } else if (agentId) {
     filter.agentId = agentId;
+  } else {
+    filter = await activeAgentSimFilter();
   }
 
   const sims = await SimCard.find(filter).populate('agentId', 'name').sort({ sessionId: 1 });

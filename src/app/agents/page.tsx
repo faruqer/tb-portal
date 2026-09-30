@@ -119,14 +119,16 @@ export default function AgentsPage() {
       ]);
       setAgents(agentsData);
       setSims(simsData);
-      if (!selectedAgent && agentsData.length > 0) setSelectedAgent(agentsData[0].id);
+      setSelectedAgent((current) =>
+        agentsData.some((a) => a.id === current) ? current : agentsData[0]?.id ?? ''
+      );
       setDataReady(true);
     } catch (err) {
       console.error(err);
     } finally {
       setDataLoading(false);
     }
-  }, [selectedAgent]);
+  }, []);
 
   useEffect(() => {
     if (!loading) load().catch(console.error);
@@ -161,6 +163,20 @@ export default function AgentsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+    setEditModal(false);
+    await load();
+  }
+
+  async function deleteAgent() {
+    if (!selectedAgentData) return;
+    if (
+      !confirm(
+        `Delete agent "${selectedAgentData.name}" (@${selectedAgentData.username})?\n\n` +
+          `They will no longer be able to log in and their SIM cards will be hidden. ` +
+          `Their game history is kept and still appears in reports.`
+      )
+    ) return;
+    await apiFetch(`/api/agents/${selectedAgent}`, { method: 'DELETE' });
     setEditModal(false);
     await load();
   }
@@ -245,6 +261,9 @@ export default function AgentsPage() {
               <span className="badge badge-accent">{selectedAgentData.username}</span>
               <button type="button" className="btn-secondary btn-sm" onClick={() => setEditModal(true)}>
                 Edit Profile
+              </button>
+              <button type="button" className="btn-danger btn-sm" onClick={deleteAgent}>
+                Delete Agent
               </button>
             </div>
           )}

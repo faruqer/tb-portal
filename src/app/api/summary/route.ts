@@ -6,7 +6,7 @@ import type { GameTotals } from '@/lib/types';
 import { addDaysStr, getWeekStartStr, localDateStr } from '@/lib/calculations';
 import { resolveAgentId, emptyTotals, addToTotals } from '@/lib/game-utils';
 import { withGame, gameFromParam, currentGameType } from '@/lib/game-filter';
-import { enrichSimWithDates } from '@/lib/sim-service';
+import { activeAgentSimFilter, enrichSimWithDates } from '@/lib/sim-service';
 import { buildDateRangeMongo } from '@/lib/date-range';
 
 function sumGames(
@@ -90,15 +90,16 @@ export async function GET(req: NextRequest) {
   if (type === 'today-progress') {
     const today = new Date().toISOString().slice(0, 10);
     const wonToday = await Game.countDocuments(await withGame({ date: today }, gameKey));
-    const totalSims = await SimCard.countDocuments();
+    const totalSims = await SimCard.countDocuments(await activeAgentSimFilter());
     const expectedToday = totalSims / 7;
     return jsonOk({ today, wonToday, totalSims, expectedToday });
   }
 
   if (type === 'sims') {
-    const simFilter: Record<string, unknown> = {};
+    let simFilter: Record<string, unknown> = {};
     if (session!.role === 'agent') simFilter.agentId = session!.agentId;
     else if (agentId) simFilter.agentId = agentId;
+    else simFilter = await activeAgentSimFilter();
 
     const activeGameType = gameKey && gameKey !== 'all' ? gameKey : await currentGameType();
     const sims = await SimCard.find(simFilter);
@@ -112,8 +113,8 @@ export async function GET(req: NextRequest) {
 
   if (type === 'agent-sims') {
     const activeGameType = gameKey && gameKey !== 'all' ? gameKey : await currentGameType();
-    const agents = await Agent.find().sort({ name: 1 });
-    const sims = await SimCard.find();
+    const agents = await Agent.find({ deletedAt: null }).sort({ name: 1 });
+    const sims = await SimCard.find(await activeAgentSimFilter());
     const summary = agents.map((agent) => {
       const agentSims = sims.filter((s) => s.agentId.toString() === agent._id.toString());
       let free = 0;
@@ -185,9 +186,11 @@ export async function GET(req: NextRequest) {
     const byAgent = agents.map((agent) => {
       const agentIdStr = agent._id.toString();
       const agentGames = games.filter((g) => resolveAgentId(g.agentId) === agentIdStr);
-      return { agentId: agentIdStr, agentName: agent.name, totals: sumGames(agentGames) };
+      const agentName = agent.deletedAt ? `${agent.name} (deleted)` : agent.name;
+      return { agentId: agentIdStr, agentName, totals: sumGames(agentGames) };
     });
-    return jsonOk(byAgent);
+    // Deleted agents only appear when they have games in the selected range.
+    return jsonOk(byAgent.filter((a, i) => !agents[i].deletedAt || a.totals.count > 0));
   }
 
   return jsonOk({ date: date || 'all', totals, games: games.length });
